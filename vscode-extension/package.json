@@ -1,0 +1,24 @@
+{
+  "name": "turnipot-bridge",
+  "displayName": "Turnipot Bridge",
+  "description": "Lets the Turnipot app focus and type into integrated terminals running Claude Code.",
+  "version": "0.2.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": { "vscode": "^1.80.0" },
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionKind": ["ui", "workspace"],
+  "contributes": {
+    "configuration": {
+      "title": "Turnipot Bridge",
+      "properties": {
+        "turnipot.raiseWindowViaCli": {
+          "type": "boolean",
+          "default": true,
+          "description": "When focusing a terminal, raise this window by running the bundled CLI with --reuse-window on this window's workspace."
+        }
+      }
+    }
+  }
+}

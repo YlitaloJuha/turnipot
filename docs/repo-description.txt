@@ -1,0 +1,1 @@
+Turnipot: Claude Code in your MacBook's notch. Every session, its context and your usage at a glance; allow tool calls, answer questions and approve plans from the notch.
