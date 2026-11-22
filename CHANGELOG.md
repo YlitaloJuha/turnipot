@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- The near-limit banner stays put while you move the pointer to its **Got it** button, instead of opening the panel underneath. Click the banner itself to open the panel.
+
 ## 0.6.0
 
 **Claude Desktop**

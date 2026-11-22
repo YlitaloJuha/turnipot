@@ -34,4 +34,20 @@ func registerAppStateTests() {
     expectEqual(compound.suggestedAlwaysRule, "Bash(cd x && rm -rf y)", "permission: compound command -> exact rule")
     let mcp = request(#"{"tool_name":"mcp__gh__get_issue","tool_input":{}}"#)
     expectEqual(mcp.suggestedAlwaysRule, "mcp__gh__get_issue", "permission: non-Bash -> tool name")
+
+    // Near-limit banner: hovering keeps it (reaching for "Got it" must not open the panel).
+    MainActor.assumeIsolated {
+        let app = AppState()
+        app.updateUsage(UsageSnapshot(windows: [UsageWindow(label: "session", percent: 90, resetsText: "")],
+                                      fetchedAt: Date(), stale: false))
+        expectEqual(app.mode, .nearLimit, "near limit: banner shown")
+        app.setHovering(true)
+        expectEqual(app.mode, .nearLimit, "near limit: hover keeps the banner")
+        app.expand()
+        expectEqual(app.mode, .expanded, "near limit: clicking the banner opens the panel")
+        app.collapse()
+        app.setHovering(true)
+        app.dismissNearLimit()
+        expectEqual(app.mode, .expanded, "near limit: after Got it, hover opens the panel again")
+    }
 }
