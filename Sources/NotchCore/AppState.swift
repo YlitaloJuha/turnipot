@@ -48,6 +48,8 @@ public final class AppState: ObservableObject {
     /// Session whose reply reader is open (mode `.reader`); nil when closed. Pinned: hover-out
     /// doesn't close it; ✕ / esc / back / click outside do.
     @Published public private(set) var readerSessionId: String?
+    /// Claude Desktop's session records (titles, side-session parents, which tab it shows).
+    public private(set) var desktopSnapshot: ClaudeDesktopSessions.Snapshot = .empty
     /// Latest permission request time per session (for the away summary's "asked you something").
     private var lastAskedAt: [String: Date] = [:]
     /// Sessions whose terminal may be showing Claude's own permission / question / plan dialog
@@ -143,15 +145,19 @@ public final class AppState: ObservableObject {
     /// Sessions highlighted in the panel (see `panelHighlight`; the live unseen set while closed).
     public var panelHighlightIds: Set<String> { panelHighlight ?? Set(unseenFinishedAt.keys) }
 
-    /// Expanded panel order: highlighted rows first (waiting, then done, newest first), then the rest.
-    public var panelSessions: [ClaudeSession] {
+    /// Expanded panel rows: highlighted rows first (waiting, then done, newest first), then the
+    /// rest; Claude Desktop side sessions follow the session that started them (depth 1, 2, …).
+    public var panelRows: [AttentionRules.PanelRow] {
         var map: [String: UnseenItem] = [:]
         for id in panelHighlightIds {
             guard let at = unseenFinishedAt[id] ?? lastFinishedAt[id] else { continue }
             map[id] = UnseenItem(sessionId: id, finishedAt: at, kind: unseenKind(for: id))
         }
-        return AttentionRules.panelOrder(sessions, highlighted: map)
+        return AttentionRules.groupedBySpawn(AttentionRules.panelOrder(sessions, highlighted: map))
     }
+
+    /// `panelRows` without the depths.
+    public var panelSessions: [ClaudeSession] { panelRows.map(\.session) }
 
     // MARK: Inputs — SessionMonitor
 
@@ -162,6 +168,9 @@ public final class AppState: ObservableObject {
         let old = Dictionary(sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { a, _ in a })
         var merged: [ClaudeSession] = []
         for var s in incoming {
+            if s.host == .claudeDesktop {
+                s.desktop = desktopSnapshot.info(cliSessionId: s.sessionId) ?? s.desktop ?? old[s.sessionId]?.desktop
+            }
             if let prev = old[s.sessionId] {
                 if s.tokens == .zero { s.tokens = prev.tokens }
                 if s.model == nil { s.model = prev.model }
@@ -216,6 +225,20 @@ public final class AppState: ObservableObject {
         if subagents.keys.contains(where: { !incomingIds.contains($0) }) {
             subagents = subagents.filter { incomingIds.contains($0.key) }
         }
+        recomputeMode()
+    }
+
+    // MARK: Inputs — Claude Desktop (via SessionMonitor / the app layer)
+
+    /// Claude Desktop's session records changed (titles, parents). Nothing here marks a session
+    /// seen: the done / waiting mark stays until it is cleared in Turnipot.
+    public func updateDesktopSessions(_ snapshot: ClaudeDesktopSessions.Snapshot) {
+        desktopSnapshot = snapshot
+        var next = sessions
+        for i in next.indices where next[i].host == .claudeDesktop {
+            if let info = snapshot.info(cliSessionId: next[i].sessionId) { next[i].desktop = info }
+        }
+        if next != sessions { sessions = next }
         recomputeMode()
     }
 

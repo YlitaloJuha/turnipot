@@ -178,6 +178,43 @@ public enum AttentionRules {
         let rest = sessions.filter { highlighted[$0.sessionId] == nil }
         return top + rest
     }
+
+    /// A panel row: the session and how deep it sits under the sessions that started it.
+    public struct PanelRow: Identifiable, Equatable, Sendable {
+        public var session: ClaudeSession
+        public var depth: Int
+        public var id: String { session.sessionId }
+    }
+
+    /// Claude Desktop side sessions directly under the live session that started them (their
+    /// `DesktopSessionInfo.parentLocalId`), children in `ordered` order. A family sits where its
+    /// first member does in `ordered`, so an unseen side session still pulls it to the top.
+    /// Sessions whose parent isn't live stay where they are at depth 0.
+    public static func groupedBySpawn(_ ordered: [ClaudeSession]) -> [PanelRow] {
+        var indexByLocal: [String: Int] = [:]
+        for (i, s) in ordered.enumerated() { if let l = s.desktop?.localId { indexByLocal[l] = indexByLocal[l] ?? i } }
+        func parent(_ i: Int) -> Int? {
+            guard let p = ordered[i].desktop?.parentLocalId, let j = indexByLocal[p], j != i else { return nil }
+            return j
+        }
+        func root(_ i: Int) -> Int {
+            var cur = i, steps = 0
+            while let p = parent(cur), steps < ordered.count { cur = p; steps += 1 }
+            return cur
+        }
+        var children: [Int: [Int]] = [:]
+        for i in ordered.indices { if let p = parent(i) { children[p, default: []].append(i) } }
+        var out: [PanelRow] = []
+        var emitted = Set<Int>()
+        func emit(_ i: Int, depth: Int) {
+            guard emitted.insert(i).inserted else { return }   // also stops a parent cycle
+            out.append(PanelRow(session: ordered[i], depth: depth))
+            for c in children[i] ?? [] { emit(c, depth: depth + 1) }
+        }
+        for i in ordered.indices { emit(root(i), depth: 0) }
+        for i in ordered.indices where !emitted.contains(i) { emit(i, depth: 0) }   // cycles only
+        return out
+    }
 }
 
 // MARK: - Collapsed pill badge

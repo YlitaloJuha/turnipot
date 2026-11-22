@@ -14,6 +14,7 @@ public final class SessionMonitor {
     public let sessionsDir: URL
     public let transcriptReader: TranscriptReader
     public let subagentScanner: SubagentScanner
+    public let desktopIndex: ClaudeDesktopSessions.Index
 
     private var dirSource: DispatchSourceFileSystemObject?
     private var timer: Timer?
@@ -21,6 +22,7 @@ public final class SessionMonitor {
     private var transcriptTask: Task<Void, Never>?
     private var transcriptPending = false
     private var subagentTask: Task<Void, Never>?
+    private var desktopTask: Task<Void, Never>?
     /// pid -> parent pid (a claude process never changes its parent shell while alive).
     private var parentCache: [Int32: Int32] = [:]
     /// pid -> host (fixed for the life of the process).
@@ -29,11 +31,13 @@ public final class SessionMonitor {
     public init(appState: AppState,
                 sessionsDir: URL = NotchPaths.sessionsDir,
                 transcriptReader: TranscriptReader = TranscriptReader(),
-                subagentScanner: SubagentScanner = SubagentScanner()) {
+                subagentScanner: SubagentScanner = SubagentScanner(),
+                desktopIndex: ClaudeDesktopSessions.Index = ClaudeDesktopSessions.Index()) {
         self.appState = appState
         self.sessionsDir = sessionsDir
         self.transcriptReader = transcriptReader
         self.subagentScanner = subagentScanner
+        self.desktopIndex = desktopIndex
     }
 
     /// Start watching + polling; performs an immediate refresh.
@@ -59,6 +63,7 @@ public final class SessionMonitor {
         debounce?.cancel(); debounce = nil
         transcriptTask?.cancel(); transcriptTask = nil
         subagentTask?.cancel(); subagentTask = nil
+        desktopTask?.cancel(); desktopTask = nil
         transcriptPending = false
     }
 
@@ -100,6 +105,20 @@ public final class SessionMonitor {
         appState.updateSessions(sessions)
         refreshTranscripts(for: sessions)
         refreshSubagents()
+        refreshDesktopSessions()
+    }
+
+    /// Re-read Claude Desktop's session records (off-main; unchanged files come from cache) while
+    /// any Claude Desktop session is live. Never overlaps itself.
+    private func refreshDesktopSessions() {
+        guard desktopTask == nil, appState.sessions.contains(where: \.isClaudeDesktop) else { return }
+        let index = desktopIndex
+        desktopTask = Task { [weak self] in
+            let snapshot = await index.scan()
+            guard let self, !Task.isCancelled else { return }
+            if snapshot != self.appState.desktopSnapshot { self.appState.updateDesktopSessions(snapshot) }
+            self.desktopTask = nil
+        }
     }
 
     /// Scan subagent dirs of live sessions (off-main via actor; unchanged files come from cache).

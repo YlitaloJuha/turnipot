@@ -299,6 +299,28 @@ enum DemoMode {
             let req = PermissionRequest(sessionId: "demo-landing-page", sessionName: "landing-page", cwd: web,
                                         toolName: "ExitPlanMode", summary: "", toolInput: input, raw: raw)
             app.enqueuePermission(req) { print("demo plan decision: \($0.hookResponse)") }
+        case "expanded-side":
+            // Claude Desktop side sessions under the session that started them; one just finished.
+            func side(_ s: ClaudeSession, _ local: String, _ title: String, parent: String? = nil) -> ClaudeSession {
+                var s = s
+                s.host = .claudeDesktop
+                s.desktop = DesktopSessionInfo(localId: local, title: title, parentLocalId: parent,
+                                               parentTitle: parent == nil ? nil : "Onboarding flow polish")
+                return s
+            }
+            let mobile = home + "/code/acme-mobile"
+            let parent = side(desktop, "local_demo_p", "Onboarding flow polish")
+            let icons = side(session("mobile-icons", mobile, .busy, minutes: 12, tokens: 61_000,
+                                     text: "The app icon set and splash screen are exported. Want me to add them to the README?"),
+                             "local_demo_i", "App icon and splash screen", parent: "local_demo_p")
+            let docs2 = side(session("mobile-docs", mobile, .busy, minutes: 8, tokens: 33_000),
+                             "local_demo_d", "Privacy policy and store listing", parent: "local_demo_p")
+            let list = busyAll + [parent, icons, docs2]
+            app.updateSessions(list, now: now.addingTimeInterval(-600))
+            app.updateUsage(usage)
+            finish(list, ids: ["demo-mobile-icons"], ago: 2)
+            app.dismissFinished()
+            app.expand()
         case "expanded", "expanded-desktop":
             app.updateSessions(busyAll + [desktop])
             app.updateUsage(usage)
@@ -373,7 +395,7 @@ enum RenderCommand {
         var states = ["idle", "working", "finished", "permission", "nearlimit", "expanded",
                       "expanded-reveal", "expanded-unseen-reveal", "expanded-reply", "reader-reply", "finished-reply",
                       "unseen", "unseen-working", "unseen-mixed", "expanded-unseen", "away",
-                      "reader", "reader-working", "expanded-desktop", "finished-desktop", "reader-desktop",
+                      "reader", "reader-working", "expanded-desktop", "expanded-side", "finished-desktop", "reader-desktop",
                       "question", "question-multi", "question-single", "plan", "plan-feedback"]
         states.append(contentsOf: ["confirmation", "prompt-hook", "update-notice", "finished-dialog"])
         for state in states {

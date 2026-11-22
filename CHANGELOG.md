@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+**Claude Desktop**
+- Side sessions sit indented under the session that started them, as in Claude Desktop's sidebar, and Claude Desktop sessions show their sidebar title. Hover a side session to see which session it came from.
+
 ## 0.5.1
 
 **Claude Desktop**

@@ -241,8 +241,11 @@ public struct ClaudeSession: Identifiable, Equatable, Sendable {
     public var transcriptPath: String?
     /// Session description (custom /rename title or Claude's auto title), from the transcript.
     public var title: String?
-    /// What to show as the row's headline: the description if known, else the session name.
-    public var displayTitle: String { title ?? name }
+    /// Claude Desktop's record of this session (sidebar title, parent, focus); Desktop sessions only.
+    public var desktop: DesktopSessionInfo?
+    /// What to show as the row's headline: Claude Desktop's sidebar title, else the description
+    /// if known, else the session name.
+    public var displayTitle: String { desktop?.title ?? title ?? name }
 
     /// Last interaction: the newest of the last assistant message, the last prompt and the
     /// session file's status / update times (shown on the row as "3m").

@@ -107,9 +107,11 @@ struct ExpandedView: View {
                     .frame(height: ExpandedMetrics.rowHeight, alignment: .leading)
             } else {
                 let rows = VStack(spacing: 0) {
-                    ForEach(appState.panelSessions) { s in
+                    ForEach(appState.panelRows) { row in
+                        let s = row.session
                         SessionRow(appState: appState, session: s,
-                                   needsYou: appState.pendingPermissions.contains { $0.sessionId == s.sessionId })
+                                   needsYou: appState.pendingPermissions.contains { $0.sessionId == s.sessionId },
+                                   depth: row.depth)
                         let subRows = appState.subagentRows(for: s.sessionId)
                         if !subRows.isEmpty {
                             SubagentList(appState: appState, sessionId: s.sessionId, rows: subRows)
@@ -242,6 +244,8 @@ struct SessionRow: View {
     @ObservedObject var appState: AppState
     let session: ClaudeSession
     let needsYou: Bool
+    /// Claude Desktop side session nesting (0 = top level): the row is indented under its parent.
+    var depth: Int = 0
     @EnvironmentObject private var ui: NotchUIState
     @StateObject private var hovering = LocalState(false)
     @StateObject private var seenTask = LocalState<Task<Void, Never>?>(nil)
@@ -256,6 +260,7 @@ struct SessionRow: View {
     private var waiting: Bool { unseen && appState.unseenKind(for: id) == .waiting }
     private var accent: Color { waiting ? Theme.amber : Theme.accent }
     private var revealed: Bool { ui.revealedRowId == id }
+    private var indent: CGFloat { ExpandedMetrics.indent(depth: depth) }
 
     /// The unseen row's second line.
     static func snippet(_ s: ClaudeSession) -> String { AttentionText.lastSentence(s.lastAssistantText) ?? "Finished" }
@@ -297,7 +302,7 @@ struct SessionRow: View {
                 }
             }
             // Revealed: exactly the width ExpandedMetrics measured the wrapped text with.
-            .frame(width: revealed ? ExpandedMetrics.rowTextWidth : nil, alignment: .leading)
+            .frame(width: revealed ? ExpandedMetrics.rowTextWidth - indent : nil, alignment: .leading)
             .layoutPriority(1)
             Spacer(minLength: 4)
             // Current context window (drops after /compact), not the cumulative total.
@@ -349,6 +354,17 @@ struct SessionRow: View {
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(background))
         .animation(.easeInOut(duration: 0.25), value: unseen)
         .contentShape(Rectangle())
+        // Side session: indented under the session that started it, with a thin guide line.
+        .padding(.leading, indent)
+        .overlay(alignment: .leading) {
+            if depth > 0 {
+                Rectangle()
+                    .fill(Theme.muted.opacity(0.35))
+                    .frame(width: 1)
+                    .padding(.leading, indent - ExpandedMetrics.indentStep / 2)
+                    .padding(.vertical, -2)
+            }
+        }
         .onHover { inside in
             hovering.value = inside
             ui.rowHover(id, inside: inside)
@@ -411,8 +427,9 @@ struct SessionRow: View {
         if session.isClaudeDesktop {
             // "Claude Desktop · ~/code/acme-api · context 69k · …"
             parts[0] = "Claude Desktop"
+            let parent = session.desktop?.parentTitle.map { "\nSide session of “\($0)”" } ?? ""
             return "Click to show in Claude Desktop · scroll down (or ≡) to read Claude's reply\n"
-                + parts.joined(separator: " · ") + "\n" + session.name
+                + parts.joined(separator: " · ") + "\n" + session.name + parent
         }
         return "Click to open the terminal · scroll down (or ≡) to read Claude's reply\n" + parts.joined(separator: " · ")
     }
