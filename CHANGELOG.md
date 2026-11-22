@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 **Terminal and iTerm2**
 - Click a session running in Terminal or iTerm2 to bring its tab forward, and send quick replies into it. Nothing to install: macOS asks once per app whether Turnipot may control it (the app now has the Apple Events entitlement for this).
