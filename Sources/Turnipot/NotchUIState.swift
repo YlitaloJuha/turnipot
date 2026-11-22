@@ -612,6 +612,25 @@ enum PillLayout {
         return w + trailingPad
     }
 
+    /// Right wing: usage text + ring (CollapsedView.rightWing), e.g. "100% 5h" near the limit.
+    static let usageGap: CGFloat = 6
+    static let ringSize: CGFloat = 18
+    static let rightTrailingPad: CGFloat = 10
+    static let usageFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+
+    static func rightWidth(appState: AppState) -> CGFloat {
+        let text: String, font: NSFont
+        if let w = appState.usage.nearLimitWindow {
+            text = "\(w.percent)% \(Fmt.usageShortLabel(w.label))"; font = countFont
+        } else if appState.isAnyBusy || appState.hasUnseen,
+                  let w = appState.usage.sessionWindow ?? appState.usage.windows.first {
+            text = "\(w.percent)%"; font = usageFont
+        } else {
+            return 0   // session count only: always fits
+        }
+        return textWidth(text, font: font) + usageGap + ringSize + rightTrailingPad
+    }
+
     static func badge(appState: AppState, ui: NotchUIState) -> PillBadge? {
         let c = appState.unseenCounts
         return PillBadge.choose(waiting: c.waiting, done: c.done) {
@@ -621,9 +640,14 @@ enum PillLayout {
 
     static func wing(appState: AppState, ui: NotchUIState) -> CGFloat {
         let wide = appState.isAnyBusy || appState.isNearLimit || appState.hasUnseen
-        let base = wide ? NotchGeometry.collapsedWingWidth : NotchGeometry.idleWingWidth
-        guard let b = badge(appState: appState, ui: ui) else { return base }
-        return max(base, ceil(leftWidth(appState: appState, ui: ui, badge: b)))
+        // Both wings share one width: wide enough for the badge on the left and the usage text
+        // on the right (a 3-digit "100% 5h" doesn't fit the default).
+        var width = max(wide ? NotchGeometry.collapsedWingWidth : NotchGeometry.idleWingWidth,
+                        ceil(rightWidth(appState: appState)))
+        if let b = badge(appState: appState, ui: ui) {
+            width = max(width, ceil(leftWidth(appState: appState, ui: ui, badge: b)))
+        }
+        return width
     }
 }
 

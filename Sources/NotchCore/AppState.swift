@@ -513,7 +513,9 @@ public final class AppState: ObservableObject {
 
     // MARK: Mode
 
-    /// Priority: permission > reader > away summary > finished > expanded (pinned or hover) > nearLimit > collapsed.
+    /// Priority: permission > reader > away summary > finished > pinned expanded > nearLimit >
+    /// hover expanded > collapsed. Hover never replaces the near-limit banner: reaching for its
+    /// "Got it" button would open the panel under the pointer (clicking the banner still does).
     public func recomputeMode() {
         let newMode: IslandMode
         if let p = pendingPermissions.first {
@@ -524,10 +526,12 @@ public final class AppState: ObservableObject {
             newMode = .awaySummary
         } else if let sid = latestFinishedSessionId {
             newMode = .finished(sessionId: sid)
-        } else if isPinnedExpanded || isHovering {
+        } else if isPinnedExpanded {
             newMode = .expanded
         } else if isNearLimit && !nearLimitDismissed {
             newMode = .nearLimit
+        } else if isHovering {
+            newMode = .expanded
         } else {
             newMode = .collapsed
         }
