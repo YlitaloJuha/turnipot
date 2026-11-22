@@ -128,7 +128,9 @@ enum DumpCommand {
             d["terminalApp"] = loc?.appPath ?? NSNull()
             d["tty"] = loc?.tty ?? NSNull()
             if s.host == .claudeDesktop {
-                d["focus"] = "open -b \(NotchConstants.claudeDesktopBundleId)"
+                d["focus"] = ClaudeDesktopSessions.deepLink(cliSessionId: s.sessionId,
+                                                            sessionsDir: NotchPaths.claudeDesktopSessionsDir)
+                    .map { "open \($0)" } ?? "open -b \(NotchConstants.claudeDesktopBundleId)"
             } else if let loc, let t = loc.terminal {
                 d["focus"] = "\(t.displayName) AppleScript (tty)"
             } else {

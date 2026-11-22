@@ -6,8 +6,9 @@ public protocol TerminalControlling: AnyObject, Sendable {
     func focus(session: ClaudeSession) async -> Bool
     /// Type `text` + Enter into the session's terminal.
     func send(session: ClaudeSession, text: String) async -> Bool
-    /// Bring Claude Desktop to the front (Claude Desktop sessions). There is no documented deep
-    /// link to a specific Code session, so this only activates the app.
+    /// Bring Claude Desktop to the front on this session (Claude Desktop sessions): opens its
+    /// `claude://code/continue?session=local_…` link, or just activates the app when the session
+    /// can't be matched to one of Claude Desktop's.
     func activateClaudeDesktop(session: ClaudeSession) async -> Bool
 }
 
@@ -35,8 +36,9 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
     public typealias Opener = @Sendable (_ openArguments: [String]) -> Void
 
     public let runtimeDir: URL
-    /// Activates Claude Desktop (injectable so tests never launch it).
-    let desktopActivator: @Sendable () -> Void
+    /// Shows a Claude Desktop session, given its Claude Code session id (injectable so tests
+    /// never launch it).
+    let desktopActivator: @Sendable (_ cliSessionId: String) -> Void
     /// Sessions whose terminal may be showing a Claude dialog (kept in sync by AppState):
     /// `send` refuses them, since the reply's Enter would pick the dialog's highlighted option.
     public let sendGate: TerminalSendGate
@@ -49,7 +51,7 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
 
     public init(runtimeDir: URL = NotchPaths.runtimeDir,
                 sendGate: TerminalSendGate = TerminalSendGate(),
-                desktopActivator: @escaping @Sendable () -> Void = { TerminalBridge.activateClaudeDesktopApp() },
+                desktopActivator: @escaping @Sendable (_ cliSessionId: String) -> Void = { TerminalBridge.showClaudeDesktopSession(cliSessionId: $0) },
                 locator: @escaping Locator = { NativeTerminal.locate(pid: $0) },
                 scriptRunner: @escaping ScriptRunner = { NativeTerminal.runScript($0, arguments: $1) },
                 opener: @escaping Opener = { TerminalBridge.runOpen($0) }) {
@@ -137,12 +139,13 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
         return (info.kp_eproc.e_pgid, info.kp_eproc.e_tpgid, info.kp_proc.p_stat == SSTOP)
     }
 
-    /// `/usr/bin/open -b com.anthropic.claudefordesktop`.
+    /// Opens the session in Claude Desktop (see `showClaudeDesktopSession`).
     public func activateClaudeDesktop(session: ClaudeSession) async -> Bool {
         let activate = desktopActivator
+        let id = session.sessionId
         return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                activate()
+                activate(id)
                 cont.resume(returning: true)
             }
         }
@@ -206,6 +209,20 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
     /// (mirrors activateEditor; no AppKit in NotchCore).
     public static func activateClaudeDesktopApp() {
         runOpen(["-b", NotchConstants.claudeDesktopBundleId])
+    }
+
+    /// Switch Claude Desktop to the session whose Claude Code session id is `cliSessionId`:
+    /// `open claude://code/continue?session=local_…` (Claude Desktop's own deep link; it also
+    /// brings the app forward). With several sessions open, merely activating the app would leave
+    /// whichever one was last shown. Falls back to activating the app when no match is found.
+    public static func showClaudeDesktopSession(cliSessionId: String,
+                                                sessionsDir: URL = NotchPaths.claudeDesktopSessionsDir,
+                                                opener: Opener = { runOpen($0) }) {
+        if let url = ClaudeDesktopSessions.deepLink(cliSessionId: cliSessionId, sessionsDir: sessionsDir) {
+            opener([url])
+        } else {
+            opener(["-b", NotchConstants.claudeDesktopBundleId])
+        }
     }
 
     public static func runOpen(_ arguments: [String]) {
