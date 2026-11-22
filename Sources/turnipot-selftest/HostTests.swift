@@ -76,7 +76,7 @@ func registerHostTests() {
     defer { if listener >= 0 { close(listener) } }
     check("bridge: test listener up", listener >= 0)
     let activations = Counter()
-    let bridge = TerminalBridge(runtimeDir: rt, desktopActivator: { activations.bump() }, locator: { _ in nil })
+    let bridge = TerminalBridge(runtimeDir: rt, desktopActivator: { _ in activations.bump() }, locator: { _ in nil })
     let now = Date()
     let desk = ClaudeSession(pid: 3270, shellPid: 3269, host: .claudeDesktop, sessionId: "D", cwd: "/x",
                              name: "d", status: .idle, startedAt: now, updatedAt: now)
@@ -98,6 +98,33 @@ func registerHostTests() {
     check("bridge: terminal focus without answer fails", !run { await bridge.focus(session: term) })
     expectEqual(drainPending(listener), 1, "bridge: terminal focus connected to the editor socket")
     expectEqual(activations.value, 2, "bridge: terminal focus never activates Claude Desktop")
+
+    // MARK: Claude Desktop deep link to the exact session (cliSessionId -> local_… id)
+    let cds = rt.appendingPathComponent("ccs", isDirectory: true)
+    let org = cds.appendingPathComponent("acct/org", isDirectory: true)
+    try? FileManager.default.createDirectory(at: org, withIntermediateDirectories: true)
+    func record(_ local: String, _ cli: String, archived: Bool = false, activity: Double = 1) {
+        let json = #"{"sessionId":"\#(local)","cliSessionId":"\#(cli)","isArchived":\#(archived),"lastActivityAt":\#(activity)}"#
+        try? json.write(to: org.appendingPathComponent("\(local).json"), atomically: true, encoding: .utf8)
+    }
+    record("local_aaa", "cli-1")
+    record("local_bbb", "cli-2", activity: 5)
+    record("local_ccc", "cli-2", archived: true, activity: 9)   // archived copy loses
+    record("local_ddd", "cli-2", activity: 3)
+    record("local_bad id", "cli-3")                             // not a valid Desktop id
+    expectEqual(ClaudeDesktopSessions.localSessionId(cliSessionId: "cli-1", sessionsDir: cds), "local_aaa", "desktop link: id by cliSessionId")
+    expectEqual(ClaudeDesktopSessions.localSessionId(cliSessionId: "cli-2", sessionsDir: cds), "local_bbb", "desktop link: live, most recent record")
+    expectEqual(ClaudeDesktopSessions.localSessionId(cliSessionId: "cli-3", sessionsDir: cds), nil, "desktop link: invalid id ignored")
+    expectEqual(ClaudeDesktopSessions.localSessionId(cliSessionId: "cli", sessionsDir: cds), nil, "desktop link: no substring match")
+    let opened = CallLog()
+    TerminalBridge.showClaudeDesktopSession(cliSessionId: "cli-1", sessionsDir: cds, opener: { opened.add($0.joined(separator: " ")) })
+    TerminalBridge.showClaudeDesktopSession(cliSessionId: "nope", sessionsDir: cds, opener: { opened.add($0.joined(separator: " ")) })
+    expectEqual(opened.take(), ["claude://code/continue?session=local_aaa", "-b com.anthropic.claudefordesktop"],
+                "desktop link: opens the session, else just the app")
+    let ids = CallLog()
+    let idBridge = TerminalBridge(runtimeDir: rt, desktopActivator: { ids.add($0) }, locator: { _ in nil })
+    _ = run { await idBridge.show(session: desk) }
+    expectEqual(ids.take(), ["D"], "bridge: Claude Desktop shown by the session's id")
 
     // Quick reply only while claude is the terminal's foreground job (after ^Z the shell would
     // run the reply as a command).

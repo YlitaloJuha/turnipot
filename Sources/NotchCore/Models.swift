@@ -35,6 +35,11 @@ public enum NotchPaths {
     public static var runtimeDir: URL {
         home.appendingPathComponent("Library/Application Support/Turnipot", isDirectory: true)
     }
+    /// Claude Desktop's Code-tab session records:
+    /// ~/Library/Application Support/Claude/claude-code-sessions/<account>/<org>/local_<uuid>.json
+    public static var claudeDesktopSessionsDir: URL {
+        home.appendingPathComponent("Library/Application Support/Claude/claude-code-sessions", isDirectory: true)
+    }
     /// ~/Library/Application Support/Turnipot/app.sock (permission hook -> app)
     public static var appSocket: URL { runtimeDir.appendingPathComponent("app.sock") }
     /// Prefix/suffix of VSCodium extension sockets: vscode-<pid>.sock

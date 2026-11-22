@@ -148,7 +148,7 @@ func registerGuardTests() {
     let bridgeGate = TerminalSendGate()
     bridgeGate.setBlocked(["B"])
     let rt = URL(fileURLWithPath: "/tmp/notch-guard-\(getpid())", isDirectory: true)
-    let bridge = TerminalBridge(runtimeDir: rt, sendGate: bridgeGate, desktopActivator: {}, locator: { _ in nil })
+    let bridge = TerminalBridge(runtimeDir: rt, sendGate: bridgeGate, desktopActivator: { _ in }, locator: { _ in nil })
     let me = ClaudeSession(pid: getpid(), shellPid: getppid(), sessionId: "B", cwd: "/x", name: "b",
                            status: .idle, startedAt: Date(), updatedAt: Date())
     let done = DispatchSemaphore(value: 0)

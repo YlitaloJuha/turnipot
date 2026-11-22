@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+**Claude Desktop**
+- Clicking a Claude Desktop session (or "Reply in Claude ↗" / "Answer in Claude ↗") now opens that exact session, not whichever one Claude Desktop last showed. Turnipot finds Claude Desktop's id for the session and opens its `claude://code/continue` link; if it can't, it just brings Claude Desktop forward as before.
+
 ## 0.5.0
 
 **Terminal and iTerm2**

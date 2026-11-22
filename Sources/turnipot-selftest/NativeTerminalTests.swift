@@ -50,7 +50,7 @@ func registerNativeTerminalTests() {
     let rt = URL(fileURLWithPath: "/tmp/notch-native-\(getpid())", isDirectory: true)   // no sockets in it
     let log = CallLog()
     func bridge(_ location: NativeTerminal.Location?, result: NativeTerminal.ScriptResult = .ok) -> TerminalBridge {
-        TerminalBridge(runtimeDir: rt, desktopActivator: { log.add("desktop") },
+        TerminalBridge(runtimeDir: rt, desktopActivator: { _ in log.add("desktop") },
                        locator: { _ in location },
                        scriptRunner: { script, args in
                            let reply = script.range(of: "[200~\" & ").map { r in String(script[r.upperBound...].prefix { $0 != "\n" }) } ?? ""
@@ -102,7 +102,7 @@ func registerNativeTerminalTests() {
     expectEqual(log.take(), [], "bridge native: nothing activated")
 
     let gate = TerminalSendGate(); gate.setBlocked(["N"])
-    let gated = TerminalBridge(runtimeDir: rt, sendGate: gate, desktopActivator: {}, locator: { _ in terminalApp },
+    let gated = TerminalBridge(runtimeDir: rt, sendGate: gate, desktopActivator: { _ in }, locator: { _ in terminalApp },
                                scriptRunner: { _, _ in log.add("script"); return .ok }, opener: { _ in })
     check("bridge native: dialog flag refuses the reply", !run { await gated.send(session: me, text: "1") })
     expectEqual(log.take(), [], "bridge native: flagged session never scripted")
@@ -119,7 +119,7 @@ func registerNativeTerminalTests() {
     }
 }
 
-private final class CallLog: @unchecked Sendable {
+final class CallLog: @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String] = []
     func add(_ s: String) { lock.lock(); items.append(s); lock.unlock() }
