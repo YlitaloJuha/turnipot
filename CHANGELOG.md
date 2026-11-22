@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 **Usage resets**
 - When your 5-hour window or weekly limit resets, the notch drops down to say so ("Session (5h) usage reset"), the bar drains back down, and the turnip gets watered and perks up. It only does this for a window you had used at least half of, and goes away by itself after a few seconds (it stays while the pointer is on it).
