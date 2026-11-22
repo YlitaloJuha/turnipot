@@ -74,9 +74,18 @@ When a session finishes, the notch drops down with Claude's last sentence and a 
 
 ### Works with your terminal, editor and Claude Desktop
 
-- **Terminal and iTerm2:** click a session to bring its tab forward, or send a quick reply into it. Nothing to install: the first time, macOS asks whether Turnipot may control Terminal (or iTerm2). Other terminal apps (Ghostty, Warp, WezTerm, …) are brought to the front when you click a session, without picking the tab, and quick reply isn't available there. Sessions inside tmux or over ssh can't be located.
-- **VSCodium, VS Code and Cursor:** click a session to jump straight to its integrated terminal (the right window comes forward), or send a quick reply into it. Uses a tiny bundled bridge extension.
-- **Claude Desktop:** sessions from the Code tab show up too; clicking one brings Claude Desktop forward.
+Every Claude Code session shows up in the notch wherever it runs. What a click and a quick reply can do depends on where that is:
+
+| Where the session runs | Click a session | Quick reply | Setup |
+|---|---|---|---|
+| **Terminal** | Brings its tab and window forward | ✓ | None; macOS asks once to let Turnipot control Terminal |
+| **iTerm2** | Brings its tab and window forward | ✓ | None; macOS asks once to let Turnipot control iTerm2 |
+| **VSCodium, VS Code, Cursor** | Opens its integrated terminal in the right window | ✓ | ⚙ → Install editor extension… |
+| **Claude Desktop** (Code tab) | Brings Claude Desktop forward | Reply in Claude ↗ | None |
+| Other terminals (Ghostty, Warp, WezTerm, …) | Brings the app forward (not the tab) | – | None |
+| tmux, ssh | – | – | – |
+
+Quick reply never types into a terminal while Claude may be showing its own prompt there, or after the session was suspended with ^Z.
 
 ### Meet the turnip
 
@@ -146,7 +155,7 @@ rm -rf /Applications/Turnipot.app "$HOME/Library/Application Support/Turnipot"
 defaults delete com.juhaylitalo.turnipot  # the settings (mascot, haptics, update check)
 ```
 
-The editor extension is listed as "Turnipot Bridge" in each editor's Extensions view.
+The editor extension is listed as "Turnipot Bridge" in each editor's Extensions view. Turnipot's permission to control Terminal / iTerm2 can be removed in System Settings → Privacy & Security → Automation (or with `tccutil reset AppleEvents com.juhaylitalo.turnipot`).
 
 ## Contributing
 
