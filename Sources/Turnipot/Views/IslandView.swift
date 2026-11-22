@@ -194,7 +194,7 @@ struct IslandView: View {
         // Only the pill / near-limit banner react to a bare tap (a tap recognizer on the whole
         // island would compete with text selection in the reader).
         .gesture(TapGesture().onEnded { tapped(presentation) },
-                 including: presentation.isCollapsed || presentation == .nearLimit ? .all : .subviews)
+                 including: presentation.isCollapsed || presentation == .nearLimit || presentation == .usageReset ? .all : .subviews)
         .contextMenu { IslandMenuItems(appState: appState, ui: ui) }
         .opacity(ui.islandOpacity)
         .onAppear { if displayed == nil { displayed = target } }
@@ -289,6 +289,10 @@ struct IslandView: View {
             if let w = appState.usage.nearLimitWindow {
                 NearLimitView(appState: appState, window: w)
             }
+        case .usageReset:
+            if let r = appState.usageReset {
+                UsageResetView(appState: appState, reset: r)
+            }
         case .confirmation:
             if let c = ui.confirmation {
                 ConfirmationView(confirmation: c, mood: appState.mascotMood)
@@ -305,6 +309,7 @@ struct IslandView: View {
         case .permission: return Theme.amber.opacity(0.35)
         case .collapsed: return .clear
         case .nearLimit: return Theme.red.opacity(0.25)
+        case .usageReset: return Theme.green.opacity(0.22)
         default: return Color.black.opacity(0.5)
         }
     }
@@ -313,6 +318,7 @@ struct IslandView: View {
     private func tapped(_ p: Presentation) {
         switch p {
         case .collapsed, .nearLimit: appState.expand()
+        case .usageReset: appState.dismissUsageReset(); appState.expand()
         default: break
         }
     }

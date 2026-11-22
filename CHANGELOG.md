@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+**Usage resets**
+- When your 5-hour window or weekly limit resets, the notch drops down to say so ("Session (5h) usage reset"), the bar drains back down, and the turnip gets watered and perks up. It only does this for a window you had used at least half of, and goes away by itself after a few seconds (it stays while the pointer is on it).
+- If the reset happened while you were away, it shows as a row in the **While you were away** summary instead, in time order with the sessions that finished.
+
 ## 0.6.1
 
 - The near-limit banner stays put while you move the pointer to its **Got it** button, instead of opening the panel underneath. Click the banner itself to open the panel.

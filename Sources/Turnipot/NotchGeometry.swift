@@ -29,6 +29,7 @@ struct NotchGeometry: Equatable {
     static let permissionSize = CGSize(width: 560, height: 114)
     static let expandedSize = CGSize(width: 600, height: 440)   // max; actual height is content-driven
     static let nearLimitSize = CGSize(width: 380, height: 58)
+    static let usageResetSize = CGSize(width: 460, height: 84)
     static let confirmationSize = CGSize(width: 300, height: 34)
     /// Setup prompts / update notice (confirmation with lines and buttons).
     static let promptWidth: CGFloat = 520
@@ -98,6 +99,7 @@ struct NotchGeometry: Equatable {
         case .permission: return CGSize(width: Self.permissionSize.width, height: notchHeight + Self.permissionSize.height)
         case .expanded: return CGSize(width: Self.expandedSize.width, height: 300)
         case .nearLimit: return CGSize(width: Self.nearLimitSize.width, height: notchHeight + Self.nearLimitSize.height)
+        case .usageReset: return CGSize(width: Self.usageResetSize.width, height: notchHeight + Self.usageResetSize.height)
         case .awaySummary: return CGSize(width: Self.awaySummaryWidth, height: notchHeight + 120)
         case .reader: return CGSize(width: Self.readerWidth, height: readerMaxHeight)
         }

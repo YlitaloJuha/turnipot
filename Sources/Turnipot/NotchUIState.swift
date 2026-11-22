@@ -262,6 +262,7 @@ enum Presentation: Equatable {
     case permission(requestId: UUID)
     case expanded
     case nearLimit
+    case usageReset
     case confirmation
     /// Reply reader (AppState.readerSessionId).
     case reader(sessionId: String)
@@ -276,6 +277,7 @@ enum Presentation: Equatable {
         case .permission(let id): return "permission-\(id)"
         case .expanded: return "expanded"
         case .nearLimit: return "nearLimit"
+        case .usageReset: return "usageReset"
         case .confirmation: return "confirmation"
         case .awaySummary: return "awaySummary"
         case .reader(let s): return "reader-\(s)"
@@ -301,6 +303,8 @@ enum Presentation: Equatable {
             return .expanded
         case .nearLimit where appState.usage.nearLimitWindow != nil:
             return .nearLimit
+        case .usageReset where appState.usageReset != nil:
+            return .usageReset
         default:
             return .collapsed(wing: PillLayout.wing(appState: appState, ui: ui))
         }
@@ -339,6 +343,8 @@ enum Presentation: Equatable {
                           height: ExpandedMetrics.height(appState: appState, ui: ui, strip: strip))
         case .nearLimit:
             return CGSize(width: NotchGeometry.nearLimitSize.width, height: strip + NotchGeometry.nearLimitSize.height)
+        case .usageReset:
+            return CGSize(width: NotchGeometry.usageResetSize.width, height: strip + NotchGeometry.usageResetSize.height)
         case .reader(let sid):
             return CGSize(width: NotchGeometry.readerWidth,
                           height: ReaderMetrics.height(appState: appState, ui: ui, sessionId: sid))
@@ -355,7 +361,7 @@ enum Presentation: Equatable {
         switch self {
         case .collapsed: return NotchGeometry.collapsedBottomRadius
         case .confirmation: return 20
-        case .finished, .permission, .nearLimit, .awaySummary: return 22
+        case .finished, .permission, .nearLimit, .usageReset, .awaySummary: return 22
         case .expanded, .reader: return 26
         }
     }

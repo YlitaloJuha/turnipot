@@ -19,6 +19,8 @@ struct TurnipMascotView: View {
     let pixelSize: CGFloat
     var layout: TurnipRig.Layout = .compact
     var showZ: Bool = true
+    /// Usage reset drop-down: play the watering (renders: at `mascotLoopTime`).
+    var watering: Bool = false
 
     @Environment(\.notchStaticRender) private var staticRender
     @Environment(\.mascotExtension) private var mascotExtension
@@ -35,11 +37,12 @@ struct TurnipMascotView: View {
             if staticRender {
                 Canvas { ctx, _ in
                     TurnipArt.draw(in: &ctx, mood: mood, p: pixelSize, layout: layout, extension: mascotExtension,
-                                   showZ: showZ, usage: usagePercent, time: loopTime)
+                                   showZ: showZ, usage: usagePercent, time: loopTime,
+                                   water: watering ? loopTime : nil)
                 }
             } else {
                 TurnipLayerView(mood: mood, pixelSize: pixelSize, layout: layout, showZ: showZ,
-                                extended: mascotExtension > 0.5, usage: usagePercent)
+                                extended: mascotExtension > 0.5, usage: usagePercent, watering: watering)
             }
         }
         .frame(width: size.width, height: size.height)
@@ -54,6 +57,9 @@ enum TurnipArt {
     typealias T = TurnipRig
 
     static var dx: CGFloat { CGFloat(T.leftMargin) }
+
+    /// A rect already in frame coordinates.
+    static func frameRect(_ r: TurnipRect) -> CGRect { CGRect(x: r.x, y: r.y, width: r.w, height: r.h) }
 
     static func cg(_ r: TurnipRect, dy: CGFloat = 0) -> CGRect {
         CGRect(x: CGFloat(r.x) + dx, y: CGFloat(r.y) + dy, width: CGFloat(r.w), height: CGFloat(r.h))
@@ -101,7 +107,7 @@ enum TurnipArt {
     /// Static pose (offscreen renders). `time` (render frames only) evaluates the finished
     /// spring / hop at that many seconds; nil = at rest.
     static func draw(in ctx: inout GraphicsContext, mood: MascotMood, p: CGFloat, layout: T.Layout,
-                     extension e: Double, showZ: Bool, usage: Int?, time: Double?) {
+                     extension e: Double, showZ: Bool, usage: Int?, time: Double?, water: Double? = nil) {
         let w = CGFloat(T.frameColumns) * p
         let a = potAnchor(layout)
         ctx.opacity = T.potOpacity(extension: e)
@@ -116,7 +122,12 @@ enum TurnipArt {
         }
 
         let top = CGFloat(T.topRow(for: mood, layout: layout, extension: e))
-        let pose = (mood == .hop && time != nil) ? T.finishedPose(at: time ?? 0, layout: layout) : .identity
+        let wt = water.flatMap { $0 >= 0 && $0 <= WaterRig.duration ? $0 : nil }
+        var pose = (mood == .hop && time != nil) ? T.finishedPose(at: time ?? 0, layout: layout) : .identity
+        if water != nil { pose = wt.map { WaterRig.interp(WaterRig.bodyKeys(layout), $0) } ?? .identity }
+        let leafSy = wt.map { WaterRig.interp(WaterRig.leafKeys, $0) } ?? 1
+        let face = wt.map { WaterRig.face(T.face(for: mood), at: $0) } ?? T.face(for: mood)
+        let wilted = mood == .sweat && !(wt.map { $0 >= WaterRig.happyFrom } ?? false)
         let shown = e >= 0.99
 
         // Turnip (clipped below the rim, behind the pot front).
@@ -129,9 +140,13 @@ enum TurnipArt {
         t.rotate(by: .degrees(pose.rot))
         t.scaleBy(x: CGFloat(pose.sx), y: CGFloat(pose.sy))
         t.translateBy(x: -pv.x * p, y: -pv.y * p)
-        for (ch, rects) in groups(T.leafRects(wilted: mood == .sweat)) { fill(&t, rects, T.hex(for: ch, usage: usage)) }
+        var lc = t
+        lc.translateBy(x: leafPivot.x * p, y: leafPivot.y * p)
+        lc.scaleBy(x: 1, y: CGFloat(leafSy))
+        lc.translateBy(x: -leafPivot.x * p, y: -leafPivot.y * p)
+        for (ch, rects) in groups(T.leafRects(wilted: wilted)) { fill(&lc, rects, T.hex(for: ch, usage: usage)) }
         for (ch, rects) in groups(T.bulbRects) { fill(&t, rects, T.hex(for: ch, usage: usage)) }
-        let f = faceRects(T.face(for: mood))
+        let f = faceRects(face)
         fill(&t, f.blush, T.blushHex, 0.85)
         fill(&t, f.eyes, T.eyeHex)
         fill(&t, f.mouth, T.eyeHex)
@@ -148,9 +163,46 @@ enum TurnipArt {
             }
         }
 
+        if let wt { drawWaterDrops(&clip, wt: wt, top: Double(top), pose: pose, layout: layout, p: p) }
+
         // Pot front over the turnip.
         for (ch, rects) in potGroups(rimRow: layout.rimRow) { fill(&ctx, rects, T.hex(for: ch, usage: usage)) }
         if shown && mood == .sleeping && showZ { fill(&ctx, zRects(rimRow: layout.rimRow), T.zHex) }
+        if let wt { drawWaterCan(&ctx, wt: wt, top: Double(top), layout: layout, p: p) }
+    }
+
+    /// Watering: drops fall from the tipped can's rose and splash on the leaves; sparkles on
+    /// the perked leaves. Frame coordinates (WaterRig has the motion).
+    static func drawWaterDrops(_ c: inout GraphicsContext, wt: Double, top: Double, pose: T.Pose,
+                               layout: T.Layout, p: CGFloat) {
+        func fill(_ rects: [TurnipRect], _ hex: UInt32, _ a: Double = 1) {
+            guard !rects.isEmpty else { return }
+            c.fill(Path(path(rects.map(frameRect), p: p)), with: .color(color(hex, a)))
+        }
+        for i in WaterRig.drops.indices {
+            let d = WaterRig.drop(i, at: wt, top: top, layout: layout)
+            if let r = d.drop { fill([r], T.dropHex) }
+            fill(d.splash, T.dropHex, d.splashAlpha)
+        }
+        let sp = WaterRig.sparkleAlpha(at: wt)
+        if sp > 0 {
+            fill(WaterRig.sparkleRects.map { TurnipRect($0.x + dx, $0.y + top + pose.dy, $0.w, $0.h) }, T.sparkleHex, sp)
+        }
+    }
+
+    static func drawWaterCan(_ c: inout GraphicsContext, wt: Double, top: Double, layout: T.Layout, p: CGFloat) {
+        typealias W = WaterRig
+        let m = W.canMotion(at: wt)
+        let o = W.canOrigin(top: top, layout: layout)
+        var k = c
+        k.translateBy(x: (o.x + m.dx + W.canPivot.x) * p, y: (o.y + m.dy + W.canPivot.y) * p)
+        k.rotate(by: .degrees(m.rot))
+        k.translateBy(x: -W.canPivot.x * p, y: -W.canPivot.y * p)
+        var cells: [Character: [CGRect]] = [:]
+        for (y, row) in W.can.enumerated() {
+            for (x, ch) in row.enumerated() where ch != "." { cells[ch, default: []].append(CGRect(x: x, y: y, width: 1, height: 1)) }
+        }
+        for (ch, rects) in cells { k.fill(Path(path(rects, p: p)), with: .color(color(W.canHex[ch] ?? 0xff00ff))) }
     }
 }
 
@@ -161,16 +213,19 @@ struct TurnipLayerView: NSViewRepresentable {
     let showZ: Bool
     let extended: Bool
     let usage: Int?
+    var watering: Bool = false
 
     func makeNSView(context: Context) -> TurnipNSView {
         let v = TurnipNSView(pixelSize: pixelSize, layout: layout)
         v.apply(mood: mood, showZ: showZ, extended: extended, usage: usage)
+        v.setWatering(watering)
         return v
     }
 
     func updateNSView(_ v: TurnipNSView, context: Context) {
         if v.pixelSize != pixelSize || v.layout != layout { v.rebuild(pixelSize: pixelSize, layout: layout) }
         v.apply(mood: mood, showZ: showZ, extended: extended, usage: usage)
+        v.setWatering(watering)
     }
 }
 
@@ -205,6 +260,11 @@ final class TurnipNSView: NSView {
     private let drop = CAShapeLayer()
     private let sparkles = CAShapeLayer()
     private let zLayer = CAShapeLayer()
+    /// Watering (usage reset): requested -> plays once when the view is on screen.
+    private var watering = false
+    private var waterPending = false
+    private var waterLayers: [CALayer] = []
+    private var waterGeneration = 0
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -244,6 +304,7 @@ final class TurnipNSView: NSView {
         for l in [root, whole, clip, rest, body, leavesUp, leavesDroop] { l.sublayers?.forEach { $0.removeFromSuperlayer() } }
         for l in faces.values { l.sublayers?.forEach { $0.removeFromSuperlayer() } }
         [whole, rest, body, leavesUp, leavesDroop, openEyes, bang, drop, sparkles, zLayer].forEach { $0.removeAllAnimations() }
+        waterLayers = []
         setFrameSize(frameRect.size)
 
         let f = frameRect
@@ -314,6 +375,172 @@ final class TurnipNSView: NSView {
         invalidateIntrinsicContentSize()
         let m = mood; mood = nil
         if let m { apply(mood: m, showZ: showZ, extended: extended, usage: usage) }
+    }
+
+    // MARK: Watering (usage reset)
+
+    /// Turning watering on plays the watering once (as soon as the view is in a window and the
+    /// turnip is out of its pot); turning it off just re-arms it.
+    func setWatering(_ on: Bool) {
+        guard on != watering else { return }
+        watering = on
+        waterPending = on
+        playWaterIfReady()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        playWaterIfReady()
+    }
+
+    private func playWaterIfReady() {
+        guard waterPending, window != nil, let mood, extended else { return }
+        waterPending = false
+        if Self.reduceMotion { return }
+        playWater(mood: mood)
+    }
+
+    /// The watering from WaterRig, sampled at 60 Hz into keyframe animations (the same numbers
+    /// the Canvas path draws): the can slides in and tips, drops fall and splash, the body ducks
+    /// and springs up (additive, so the mood loops keep running), the leaves flatten and perk
+    /// up, the face shuts its eyes then smiles, sparkles twinkle. Starts after the drop-down's
+    /// content has faded in; temporary layers are removed afterwards.
+    private func playWater(mood: MascotMood) {
+        waterLayers.forEach { $0.removeFromSuperlayer() }
+        waterLayers = []
+        waterGeneration += 1
+        let generation = waterGeneration
+        let p = pixelSize, W = WaterRig.self, lay = layout
+        let top = TurnipRig.restTop(for: mood, layout: lay)
+        let duration = W.duration
+        let begin = CACurrentMediaTime() + IslandMotion.contentInDelay + IslandMotion.contentInDuration
+        let n = Int(duration * 60)
+        let times = (0...n).map { Double($0) / Double(n) }
+        let keyTimes = times.map { NSNumber(value: $0) }
+        let at = times.map { $0 * duration }
+
+        func anim(_ path: String, _ values: [Any], additive: Bool = false) -> CAKeyframeAnimation {
+            let a = CAKeyframeAnimation(keyPath: path)
+            a.values = values
+            a.keyTimes = keyTimes
+            a.duration = duration
+            a.beginTime = begin
+            a.isAdditive = additive
+            return a
+        }
+        func pt(_ x: Double, _ y: Double) -> NSValue { NSValue(point: NSPoint(x: x * Double(p), y: y * Double(p))) }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        // Body: duck + squash, spring up stretched (additive over the mood loop).
+        let poses = at.map { W.interp(W.bodyKeys(lay), $0) }
+        body.add(anim("transform.translation.y", poses.map { $0.dy * Double(p) }, additive: true), forKey: "waterY")
+        body.add(anim("transform.scale.x", poses.map { $0.sx - 1 }, additive: true), forKey: "waterSX")
+        body.add(anim("transform.scale.y", poses.map { $0.sy - 1 }, additive: true), forKey: "waterSY")
+        // Leaves: flatten under the water, perk up tall.
+        let leaf = at.map { W.interp(W.leafKeys, $0) - 1 }
+        for l in [leavesUp, leavesDroop] { l.add(anim("transform.scale.y", leaf, additive: true), forKey: "water") }
+        // Face: the mood's face gives way to shut eyes, then the happy face.
+        let base = TurnipRig.face(for: mood)
+        for (face, layer) in faces {
+            if face == base {
+                layer.add(anim("opacity", at.map { W.face(base, at: $0) == base ? 1.0 : 0.0 }), forKey: "water")
+            }
+        }
+        for face in [TurnipRig.Face.closed, .happy] where face != base {
+            let g = faceLayer(face, p: p)
+            g.opacity = 0
+            body.addSublayer(g)
+            g.add(anim("opacity", at.map { W.face(base, at: $0) == face ? 1.0 : 0.0 }), forKey: "water")
+            waterLayers.append(g)
+        }
+
+        // Drops + splashes (frame coordinates, clipped below the rim like the turnip).
+        func speck(_ w: Double, _ h: Double, _ hex: UInt32) -> CAShapeLayer {
+            let l = CAShapeLayer()
+            l.path = CGPath(rect: CGRect(x: 0, y: 0, width: w * Double(p), height: h * Double(p)), transform: nil)
+            l.fillColor = Self.cg(hex)
+            l.anchorPoint = .zero
+            l.bounds = CGRect(x: 0, y: 0, width: w * Double(p), height: h * Double(p))
+            l.opacity = 0
+            clip.addSublayer(l)
+            waterLayers.append(l)
+            return l
+        }
+        for i in W.drops.indices {
+            let states = at.map { W.drop(i, at: $0, top: top, layout: lay) }
+            let d = speck(0.6, 1, TurnipRig.dropHex)
+            var last = (0.0, 0.0)
+            d.add(anim("position", states.map { s -> NSValue in
+                if let r = s.drop { last = (r.x, r.y) }
+                return pt(last.0, last.1)
+            }), forKey: "water")
+            d.add(anim("opacity", states.map { $0.drop == nil ? 0.0 : 1.0 }), forKey: "waterO")
+            for k in 0..<2 {
+                let sp = speck(0.5, 0.5, TurnipRig.dropHex)
+                var lastS = (0.0, 0.0)
+                sp.add(anim("position", states.map { s -> NSValue in
+                    if s.splash.count == 2 { lastS = (s.splash[k].x, s.splash[k].y) }
+                    return pt(lastS.0, lastS.1)
+                }), forKey: "water")
+                sp.add(anim("opacity", states.map { $0.splash.isEmpty ? 0.0 : $0.splashAlpha }), forKey: "waterO")
+            }
+        }
+        // Sparkles on the perked leaves (follow the body's vertical motion).
+        for r in W.sparkleRects {
+            let s = speck(r.w, r.h, TurnipRig.sparkleHex)
+            s.add(anim("position", zip(at, poses).map { pt(r.x + Double(TurnipRig.leftMargin), r.y + top + $1.dy) }), forKey: "water")
+            s.add(anim("opacity", at.map { W.sparkleAlpha(at: $0) }), forKey: "waterO")
+        }
+
+        // Can: slides in from the top right, tips, tips back, slides out (over the pot).
+        let cw = Double(W.can.map(\.count).max() ?? 0), chh = Double(W.can.count)
+        let can = CALayer()
+        can.bounds = CGRect(x: 0, y: 0, width: cw * Double(p), height: chh * Double(p))
+        can.anchorPoint = CGPoint(x: W.canPivot.x / cw, y: W.canPivot.y / chh)
+        can.opacity = 0
+        var cells: [Character: [CGRect]] = [:]
+        for (y, row) in W.can.enumerated() {
+            for (x, ch) in row.enumerated() where ch != "." { cells[ch, default: []].append(CGRect(x: x, y: y, width: 1, height: 1)) }
+        }
+        for (ch, rects) in cells {
+            let l = CAShapeLayer()
+            l.path = TurnipArt.path(rects, p: p)
+            l.fillColor = Self.cg(W.canHex[ch] ?? 0xff00ff)
+            l.frame = can.bounds
+            can.addSublayer(l)
+        }
+        whole.addSublayer(can)
+        waterLayers.append(can)
+        let origin = W.canOrigin(top: top, layout: lay)
+        let motion = at.map { W.canMotion(at: $0) }
+        can.add(anim("position", motion.map { pt(origin.x + $0.dx + W.canPivot.x, origin.y + $0.dy + W.canPivot.y) }), forKey: "water")
+        can.add(anim("transform.rotation.z", motion.map { $0.rot * .pi / 180 }), forKey: "waterR")
+        can.add(anim("opacity", at.map { _ in 1.0 }), forKey: "waterO")
+        CATransaction.commit()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + (begin - CACurrentMediaTime()) + duration + 0.1) { [weak self] in
+            guard let self, self.waterGeneration == generation else { return }
+            self.waterLayers.forEach { $0.removeFromSuperlayer() }
+            self.waterLayers = []
+        }
+    }
+
+    /// A face group (blush, eyes, mouth, tongue) like the ones `rebuild` makes.
+    private func faceLayer(_ face: TurnipRig.Face, p: CGFloat) -> CALayer {
+        let g = CALayer()
+        g.anchorPoint = .zero; g.bounds = frameRect; g.position = .zero
+        let r = TurnipArt.faceRects(face)
+        for (rects, hex, alpha) in [(r.blush, TurnipRig.blushHex, 0.85), (r.eyes, TurnipRig.eyeHex, 1), (r.mouth, TurnipRig.eyeHex, 1),
+                                    (r.tongue, TurnipRig.tongueHex, 1)] where !rects.isEmpty {
+            let l = CAShapeLayer()
+            l.path = TurnipArt.path(rects, p: p)
+            l.fillColor = Self.cg(hex, CGFloat(alpha))
+            l.frame = frameRect
+            g.addSublayer(l)
+        }
+        return g
     }
 
     private func restY(_ mood: MascotMood, extended: Bool) -> CGFloat {
@@ -436,6 +663,7 @@ final class TurnipNSView: NSView {
         }
         if newExtended { addLoops(newMood, reduce: reduce, p: p) }
         CATransaction.commit()
+        playWaterIfReady()
     }
 
     private func addLoops(_ mood: MascotMood, reduce: Bool, p: CGFloat) {
