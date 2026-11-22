@@ -7,7 +7,8 @@ import NotchCore
 /// `Turnipot --export-media=<dir> [--fps=25]`: renders marketing visuals offscreen (no window,
 /// no screen recording permission) from the made-up demo data in DemoMode, framed on a dark
 /// wallpaper strip with a menu bar and the physical notch, at 2x:
-///   hero.gif, finished.gif, permission.gif, reader.gif (looping animated GIFs) and
+///   hero.gif, finished.gif, permission.gif, reader.gif, reset.gif, reset-week.gif, away-reset.gif
+///   (looping animated GIFs) and
 ///   expanded.png, question.png, plan.png, away.png, mascots.png, pills.png.
 /// Animation frames use the same springs / timings as the live island (IslandMotion), like
 /// `--render`'s anim/ frames.
@@ -44,6 +45,9 @@ enum MediaExport {
 
         if want("hero") { writeGIF(heroFrames(), height: 372, to: url.appendingPathComponent("hero.gif")) }
         if want("finished") { writeGIF(finishedFrames(), height: 168, to: url.appendingPathComponent("finished.gif")) }
+        if want("reset") { writeGIF(resetFrames(week: false), height: 156, to: url.appendingPathComponent("reset.gif")) }
+        if want("reset-week") { writeGIF(resetFrames(week: true), height: 156, to: url.appendingPathComponent("reset-week.gif")) }
+        if want("away-reset") { writeGIF(awayResetFrames(), height: 236, to: url.appendingPathComponent("away-reset.gif")) }
         if want("permission") { writeGIF(permissionFrames(), height: 196, to: url.appendingPathComponent("permission.gif")) }
         if want("reader") { writeGIF(readerFrames(), height: 604, to: url.appendingPathComponent("reader.gif")) }
 
@@ -184,6 +188,43 @@ enum MediaExport {
             Frame(app: s.app, ui: s.ui, override: s.still(drop, mascotTime: min(t, TurnipRig.springDuration)))
         }
         frames += segment(0.55) { t in Frame(app: s.app, ui: s.ui, override: shrink(s, from: drop, to: before.collapsed, t: t)) }
+        return frames
+    }
+
+    /// A usage window resets: the pill (near the limit) grows into the usage-reset drop-down, the
+    /// turnip gets watered while the bar drains, then it folds back into the pill.
+    static func resetFrames(week: Bool) -> [Frame] {
+        let before = Scene(week ? "reset-week-before" : "reset-before")
+        let s = Scene(week ? "usage-reset-week" : "usage-reset")
+        let drop = Presentation.usageReset
+        var frames: [Frame] = []
+        frames += segment(0.6) { _ in Frame(app: before.app, ui: before.ui, override: before.still(before.collapsed)) }
+        frames += segment(0.5) { t in
+            var o = grow(s, from: s.collapsed, fromShape: before.shape(before.collapsed), to: drop, t: t)
+            o.mascotTime = -1   // not watering yet; the bar stays at the old percent
+            return Frame(app: s.app, ui: s.ui, override: o)
+        }
+        frames += segment(WaterRig.duration + 1.2) { t in
+            Frame(app: s.app, ui: s.ui, override: s.still(drop, mascotTime: t))
+        }
+        frames += segment(0.55) { t in Frame(app: s.app, ui: s.ui, override: shrink(s, from: drop, to: s.collapsed, t: t)) }
+        frames += segment(0.4) { _ in Frame(app: s.app, ui: s.ui, override: s.still(s.collapsed)) }
+        return frames
+    }
+
+    /// Back from being away: the "While you were away" summary lists a usage reset among the
+    /// finished sessions (time order); the strip turnip gets watered as it opens.
+    static func awayResetFrames() -> [Frame] {
+        let s = Scene("away-reset")
+        let drop = s.current
+        var frames: [Frame] = []
+        frames += segment(0.5) { _ in Frame(app: s.app, ui: s.ui, override: s.still(s.collapsed)) }
+        frames += segment(0.5) { t in
+            var o = grow(s, from: s.collapsed, to: drop, t: t)
+            o.mascotTime = -1
+            return Frame(app: s.app, ui: s.ui, override: o)
+        }
+        frames += segment(WaterRig.duration + 1.5) { t in Frame(app: s.app, ui: s.ui, override: s.still(drop, mascotTime: t)) }
         return frames
     }
 

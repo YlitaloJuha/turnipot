@@ -10,6 +10,8 @@ struct MascotView: View {
     var pixelSize: CGFloat = 2.5
     /// Show the drifting "z" while sleeping.
     var showZ: Bool = true
+    /// Play the watering (usage reset).
+    var watering: Bool = false
 
     @Environment(\.mascotStripHeight) private var stripHeight
 
@@ -22,7 +24,7 @@ struct MascotView: View {
     var body: some View {
         let rows = CGFloat(TurnipRig.Layout.compact.rows)
         let p = rows * pixelSize <= stripHeight ? pixelSize : max(1, (stripHeight / rows * 2).rounded(.down) / 2)
-        return TurnipMascotView(mood: mood, pixelSize: p, layout: .compact, showZ: showZ)
+        return TurnipMascotView(mood: mood, pixelSize: p, layout: .compact, showZ: showZ, watering: watering)
             .frame(maxHeight: .infinity, alignment: .center)
     }
 }

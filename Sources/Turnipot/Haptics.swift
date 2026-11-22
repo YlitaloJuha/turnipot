@@ -102,7 +102,7 @@ extension Presentation {
         case .finished(let sid): return .finished(sessionId: sid)
         case .permission(let id): return .needsYou(requestId: id)
         case .awaySummary: return .awaySummary
-        case .nearLimit: return .nearLimit
+        case .nearLimit, .usageReset: return .nearLimit
         case .confirmation: return .confirmation
         }
     }

@@ -13,7 +13,9 @@ import NotchCore
 /// mobile-onboarding under ~/code/acme-*); it is also what `--export-media` records.
 /// question (AskUserQuestion with 2 questions, step 1), question-single (1 question), plan (an
 /// ExitPlanMode plan longer than the drop-down); --render adds question-multi (step 2,
-/// multi-select + "Other…") and plan-feedback ("Keep planning…" open).
+/// multi-select + "Other…") and plan-feedback ("Keep planning…" open). Usage resets:
+/// usage-reset (5h window 97% -> 0%; reset-before = the pill just before), usage-reset-week
+/// (weekly 88% -> 3%; reset-week-before), away-reset (the away summary with a reset row).
 @MainActor
 enum DemoMode {
     static var requestedState: String? {
@@ -229,6 +231,21 @@ enum DemoMode {
                 ])], now: now)
                 app.expand()
             }
+        case "away-reset":
+            // Away 50m: the 5h window reset 9m ago (97% -> 0%), two sessions finished.
+            let list = missedSessions(busyThird: true, waitingFirst: false)
+            app.updateSessions(list, now: now.addingTimeInterval(-3600))
+            func snap(_ pct: Int, _ reset: String, _ at: Date) -> UsageSnapshot {
+                UsageSnapshot(windows: [UsageWindow(label: "session", percent: pct, resetsText: reset + " (America/Los_Angeles)"),
+                                        UsageWindow(label: "week (all models)", percent: 46, resetsText: "Nov 28 at 9am (America/Los_Angeles)")],
+                              fetchedAt: at, stale: false)
+            }
+            app.updateUsage(snap(97, "Nov 21 at 3:30pm", now.addingTimeInterval(-55 * 60)), now: now.addingTimeInterval(-55 * 60))
+            app.setAway(since: now.addingTimeInterval(-50 * 60))
+            finish(list, ids: ["demo-api-refactor"], ago: 31)
+            app.updateUsage(snap(0, "Nov 21 at 8:30pm", now.addingTimeInterval(-9 * 60)), now: now.addingTimeInterval(-9 * 60))
+            finish(list, ids: ["demo-landing-page"], ago: 4)
+            app.setReturned(now: now)
         case "away":
             let list = missedSessions(busyThird: false, waitingFirst: false)
             app.updateSessions(list, now: now.addingTimeInterval(-3600))
@@ -326,6 +343,20 @@ enum DemoMode {
             app.updateUsage(usage)
             app.updateSubagents(demoSubagents(now: now), now: now)
             app.expand()
+        case "reset-before", "usage-reset", "reset-week-before", "usage-reset-week":
+            // Usage reset demos: the 5h session (97% -> 0%) or the weekly window (88% -> 3%).
+            let week = state.contains("week")
+            func snap(_ before: Bool) -> UsageSnapshot {
+                UsageSnapshot(windows: [
+                    UsageWindow(label: "session", percent: week ? 12 : (before ? 97 : 0),
+                                resetsText: !week && !before ? "Nov 21 at 8:30pm (America/Los_Angeles)" : "Nov 21 at 3:30pm (America/Los_Angeles)"),
+                    UsageWindow(label: "week (all models)", percent: week ? (before ? 88 : 3) : 42,
+                                resetsText: week && !before ? "Nov 28 at 9am (America/Los_Angeles)" : "Nov 21 at 9am (America/Los_Angeles)"),
+                ], fetchedAt: now, stale: false)
+            }
+            app.updateSessions(busyAll)
+            app.updateUsage(snap(true))
+            if !state.hasSuffix("before") { app.updateUsage(snap(false)) }
         default: // working, nearlimit
             var s = busyAll
             if state == "nearlimit" { s[0].status = .idle }

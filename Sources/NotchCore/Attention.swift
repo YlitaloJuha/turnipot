@@ -267,18 +267,24 @@ public struct AwaySummary: Equatable, Sendable {
         case asked     // a permission request came in ("asked you something")
         case waiting   // finished with a question
         case done      // finished
+        case usageReset  // a usage window reset (sessionId = "usage-reset:<label>", see `reset`)
     }
 
     public struct Item: Equatable, Sendable, Identifiable {
         public var id: String { sessionId }
         public var sessionId: String
         public var kind: Kind
-        /// When it finished / asked.
+        /// When it finished / asked / reset.
         public var at: Date
+        /// `.usageReset` rows: the reset.
+        public var reset: UsageReset?
 
-        public init(sessionId: String, kind: Kind, at: Date) {
-            self.sessionId = sessionId; self.kind = kind; self.at = at
+        public init(sessionId: String, kind: Kind, at: Date, reset: UsageReset? = nil) {
+            self.sessionId = sessionId; self.kind = kind; self.at = at; self.reset = reset
         }
+
+        public static func resetId(_ label: String) -> String { "usage-reset:\(label)" }
+        public var isUsageReset: Bool { kind == .usageReset }
     }
 
     public var awaySince: Date
@@ -296,13 +302,16 @@ public struct AwaySummary: Equatable, Sendable {
     public var visibleItems: [Item] { Array(items.prefix(Self.maxVisible)) }
     public var moreCount: Int { max(0, items.count - Self.maxVisible) }
 
+    /// Asked / waiting first (they need you); finished sessions and usage resets share a rank, so
+    /// they are listed in time order (newest first).
     static func rank(_ k: Kind) -> Int { k == .asked ? 0 : k == .waiting ? 1 : 2 }
 
     /// Items for one away period: still-unseen sessions that finished while away, plus
     /// permission requests that came in while away. One item per (live) session, the most urgent
     /// kind wins (asked > waiting > done). Sorted by urgency, newest first. nil if empty.
     public static func build(awaySince: Date, returnedAt: Date, unseen: [UnseenItem],
-                             asked: [String: Date], liveSessionIds: Set<String>) -> AwaySummary? {
+                             asked: [String: Date], liveSessionIds: Set<String>,
+                             resets: [UsageReset] = []) -> AwaySummary? {
         var best: [String: Item] = [:]
         func offer(_ item: Item) {
             guard liveSessionIds.contains(item.sessionId), item.at >= awaySince, item.at <= returnedAt else { return }
@@ -315,6 +324,12 @@ public struct AwaySummary: Equatable, Sendable {
         }
         for u in unseen { offer(Item(sessionId: u.sessionId, kind: u.kind == .waiting ? .waiting : .done, at: u.finishedAt)) }
         for (sid, at) in asked { offer(Item(sessionId: sid, kind: .asked, at: at)) }
+        // Usage resets while away: one row per window (the latest reset).
+        for r in resets where r.at >= awaySince && r.at <= returnedAt {
+            let id = Item.resetId(r.window.label)
+            if let cur = best[id], cur.at >= r.at { continue }
+            best[id] = Item(sessionId: id, kind: .usageReset, at: r.at, reset: r)
+        }
         guard !best.isEmpty else { return nil }
         return AwaySummary(awaySince: awaySince, returnedAt: returnedAt, items: sorted(Array(best.values)))
     }

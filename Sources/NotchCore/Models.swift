@@ -510,6 +510,8 @@ public enum IslandMode: Equatable, Sendable {
     case permission(requestId: UUID)
     case expanded
     case nearLimit
+    /// A usage window just reset (AppState.usageReset): the turnip gets watered.
+    case usageReset
     /// "While you were away" summary (AppState.awaySummary).
     case awaySummary
     /// Scrollable reply reader for one session (AppState.readerSessionId). Behaves as pinned.

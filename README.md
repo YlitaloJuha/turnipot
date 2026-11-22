@@ -41,10 +41,11 @@ Turnipot puts all of that where your eyes already are: the notch. Hover for the 
 
 ### Every session, one glance
 
-The pill around the notch shows how many sessions are busy, your 5-hour usage, and a badge when something finished while you weren't looking. Hover to open the panel: each session with its status and **current context size** (compaction-aware: it drops right after `/compact`), plus your **account usage** for the 5-hour window and the week.
+The pill around the notch shows how many sessions are busy, your 5-hour usage, and a badge when something finished while you weren't looking. Hover to open the panel: each session with its status and **current context size** (compaction-aware: it drops right after `/compact`), plus your **account usage** for the 5-hour window and the week. When a window you had used at least half of resets, the notch drops down to tell you and the turnip gets watered (if you were away, it's a row in the **While you were away** summary).
 
 <p align="center"><img src="docs/media/pills.png" width="820" alt="The pill when idle, working, and with two finished sessions"></p>
 <p align="center"><img src="docs/media/expanded.png" width="820" alt="The expanded panel with four sessions, their context sizes, subagents and usage bars"></p>
+<p align="center"><img src="docs/media/reset.gif" width="820" alt="The 5-hour usage resets: the drop-down's bar drains from 97% to 0% while a watering can waters the turnip"></p>
 
 **Subagent sprouts.** Running subagents show up as tiny pixel sprouts next to the session's title, with a compact list underneath: what each one is doing right now, workflow phases, and how long it's been running.
 
@@ -89,7 +90,7 @@ Quick reply never types into a terminal while Claude may be showing its own prom
 
 ### Meet the turnip
 
-A little turnip lives in an orange pot in your notch. It naps while nothing runs, peeks out and bobs while Claude works, springs out of the pot when a turn ends, waves an amber "!" when Claude needs you, and wilts and sweats near your usage limit. Its leaves turn slightly olive as your weekly usage rises.
+A little turnip lives in an orange pot in your notch. It naps while nothing runs, peeks out and bobs while Claude works, springs out of the pot when a turn ends, waves an amber "!" when Claude needs you, wilts and sweats near your usage limit, and gets watered when your usage resets. Its leaves turn slightly olive as your weekly usage rises.
 
 <p align="center"><img src="docs/media/mascots.png" width="680" alt="The turnip in each mood: idle, working, finished, needs you, near limit"></p>
 

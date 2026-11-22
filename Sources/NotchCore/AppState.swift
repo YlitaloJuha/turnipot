@@ -29,6 +29,12 @@ public final class AppState: ObservableObject {
     @Published public private(set) var isPinnedExpanded: Bool = false
     /// The near-limit banner was dismissed for the current window/percent bucket.
     @Published public private(set) var nearLimitDismissed: Bool = false
+    /// Latest usage window reset to announce (cleared after UsageResetRule.lifetime / dismiss).
+    @Published public private(set) var usageReset: UsageReset?
+    private var usageResetExpiry: Task<Void, Never>?
+    /// Resets that happened while the user was away (by window label, latest wins); they become
+    /// rows of the "While you were away" summary instead of a drop-down nobody would see.
+    private var awayResets: [String: UsageReset] = [:]
 
     /// Finished sessions the user hasn't looked at yet: sessionId -> when it went busy -> idle.
     /// Cleared by focus / reply / row hover / "mark all seen" / the session going busy again;
@@ -279,9 +285,18 @@ public final class AppState: ObservableObject {
 
     // MARK: Inputs — UsageMonitor
 
-    public func updateUsage(_ snapshot: UsageSnapshot) {
+    public func updateUsage(_ snapshot: UsageSnapshot, now: Date = Date()) {
         let wasNear = usage.nearLimitWindow
+        let previous = usage.stale ? nil : usage
         usage = snapshot
+        let resets = UsageResetRule.resets(old: previous, new: snapshot, now: now)
+        if awaySince != nil {
+            for r in resets { awayResets[r.window.label] = r }
+        } else if let r = resets.first {
+            usageReset = r   // its lifetime starts when the drop-down actually shows (recomputeMode)
+            usageResetExpiry?.cancel()
+            usageResetExpiry = nil
+        }
         if let w = snapshot.nearLimitWindow {
             if wasNear == nil || (wasNear!.percent / 5) != (w.percent / 5) {
                 nearLimitDismissed = false
@@ -449,8 +464,10 @@ public final class AppState: ObservableObject {
         guard let since = awaySince else { return }
         awaySince = nil
         let live = Set(sessions.map(\.sessionId))
+        let resets = Array(awayResets.values)
+        awayResets = [:]
         if let s = AwaySummary.build(awaySince: since, returnedAt: now, unseen: unseenItems,
-                                     asked: lastAskedAt, liveSessionIds: live) {
+                                     asked: lastAskedAt, liveSessionIds: live, resets: resets) {
             awaySummary = awaySummary.map { $0.merged(with: s) } ?? s
         }
         recomputeMode()
@@ -464,6 +481,11 @@ public final class AppState: ObservableObject {
 
     /// "open ↗" in the summary: focus the session (marks it seen, removing its item).
     public func openAwayItem(sessionId: String) {
+        if sessionId.hasPrefix("usage-reset:") {   // reset row: show the usage bars in the panel
+            awaySummary = nil
+            expand()
+            return
+        }
         focusSession(id: sessionId)
         if let a = awaySummary { awaySummary = a.removing(sessionId: sessionId) }
         recomputeMode()
@@ -496,6 +518,22 @@ public final class AppState: ObservableObject {
         recomputeMode()
     }
 
+    /// Auto-dismiss of the usage-reset drop-down; paused while the pointer is over it.
+    private func startUsageResetExpiry(after seconds: TimeInterval) {
+        usageResetExpiry?.cancel()
+        usageResetExpiry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.dismissUsageReset()
+        }
+    }
+
+    public func dismissUsageReset() {
+        usageResetExpiry?.cancel()
+        usageReset = nil
+        recomputeMode()
+    }
+
     public func dismissNearLimit() {
         nearLimitDismissed = true
         recomputeMode()
@@ -504,6 +542,12 @@ public final class AppState: ObservableObject {
     public func setHovering(_ hovering: Bool) {
         guard hovering != isHovering else { return }
         isHovering = hovering
+        // Hovering keeps the usage-reset drop-down (like the near-limit banner); leaving gives it
+        // a few more seconds.
+        if mode == .usageReset {
+            if hovering { usageResetExpiry?.cancel(); usageResetExpiry = nil }
+            else { startUsageResetExpiry(after: UsageResetRule.afterHoverLifetime) }
+        }
         recomputeMode()
     }
 
@@ -513,9 +557,11 @@ public final class AppState: ObservableObject {
 
     // MARK: Mode
 
-    /// Priority: permission > reader > away summary > finished > pinned expanded > nearLimit >
-    /// hover expanded > collapsed. Hover never replaces the near-limit banner: reaching for its
-    /// "Got it" button would open the panel under the pointer (clicking the banner still does).
+    /// Priority: permission > reader > away summary > finished > usage reset > pinned expanded >
+    /// nearLimit > hover expanded > collapsed. Hover never replaces the near-limit banner or the
+    /// usage-reset drop-down: reaching for their buttons would open the panel under the pointer
+    /// (clicking them still does). A pinned panel hides the usage-reset drop-down (it comes back
+    /// when the panel closes, if it hasn't expired).
     public func recomputeMode() {
         let newMode: IslandMode
         if let p = pendingPermissions.first {
@@ -526,6 +572,8 @@ public final class AppState: ObservableObject {
             newMode = .awaySummary
         } else if let sid = latestFinishedSessionId {
             newMode = .finished(sessionId: sid)
+        } else if usageReset != nil && !isPinnedExpanded {
+            newMode = .usageReset
         } else if isPinnedExpanded {
             newMode = .expanded
         } else if isNearLimit && !nearLimitDismissed {
@@ -540,6 +588,14 @@ public final class AppState: ObservableObject {
             panelHighlight = Set(unseenFinishedAt.keys)
         } else if newMode != .expanded && panelHighlight != nil {
             panelHighlight = nil
+        }
+        // The usage-reset drop-down's lifetime runs only while it is on screen (it may wait
+        // behind a finished / permission drop-down).
+        if newMode == .usageReset && mode != .usageReset {
+            if !isHovering { startUsageResetExpiry(after: UsageResetRule.lifetime) }
+        } else if newMode != .usageReset && mode == .usageReset {
+            usageResetExpiry?.cancel()
+            usageResetExpiry = nil
         }
         if newMode != mode { mode = newMode }
     }

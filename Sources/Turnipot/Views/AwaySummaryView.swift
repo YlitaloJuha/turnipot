@@ -15,7 +15,9 @@ struct AwaySummaryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             NotchStrip(height: ui.geometry.notchHeight) {
-                MascotView(mood: .hop, pixelSize: MascotView.pixelSize(forStrip: ui.geometry.notchHeight))
+                // A usage window reset while away: the turnip gets watered as the summary opens.
+                MascotView(mood: .hop, pixelSize: MascotView.pixelSize(forStrip: ui.geometry.notchHeight),
+                           watering: summary.items.contains(where: \.isUsageReset))
             } trailing: {
                 Text("away \(Fmt.duration(seconds: summary.awayDuration))")
                     .font(.system(size: 11).monospacedDigit())
@@ -29,7 +31,11 @@ struct AwaySummaryView: View {
                     .foregroundStyle(.white)
                     .frame(height: AwaySummaryMetrics.title, alignment: .topLeading)
                 ForEach(summary.visibleItems) { item in
-                    AwayItemRow(appState: appState, item: item, onOpen: { open(item) }, onRead: { read(item) })
+                    if let r = item.reset {
+                        AwayResetRow(item: item, reset: r) { open(item) }
+                    } else {
+                        AwayItemRow(appState: appState, item: item, onOpen: { open(item) }, onRead: { read(item) })
+                    }
                 }
                 if summary.moreCount > 0 {
                     Button {
@@ -139,6 +145,49 @@ struct AwayItemRow: View {
         case .asked: return "asked you something"
         case .waiting: return "asked you something · \(Fmt.duration(since: item.at, now: now)) ago"
         case .done: return "finished \(Fmt.duration(since: item.at, now: now)) ago"
+        case .usageReset: return "reset \(Fmt.duration(since: item.at, now: now)) ago"
         }
+    }
+}
+
+/// "While you were away" row for a usage window that reset meanwhile: green dot, "Session (5h)
+/// usage reset", "was 97% · reset 9m ago"; click opens the panel (usage bars).
+struct AwayResetRow: View {
+    let item: AwaySummary.Item
+    let reset: UsageReset
+    let onOpen: () -> Void
+    @StateObject private var hovering = LocalState(false)
+
+    var body: some View {
+        HStack(spacing: 9) {
+            StatusDot(color: Theme.green, pulse: false)
+                .frame(width: 10)
+            HStack(spacing: 6) {
+                Text("\(Fmt.usageLabel(reset.window.label)) usage reset")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                    Text("was \(reset.previousPercent)% · \(Fmt.duration(since: item.at, now: ctx.date)) ago")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize()
+                }
+            }
+            .lineLimit(1)
+            Spacer(minLength: 6)
+            Text("now \(reset.window.percent)%")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(Theme.green)
+                .fixedSize()
+        }
+        .padding(.horizontal, 6)
+        .frame(height: AwaySummaryMetrics.row)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(hovering.value ? Theme.rowHover : .clear))
+        .contentShape(Rectangle())
+        .onHover { hovering.value = $0 }
+        .hapticHover("away-row:\(item.sessionId)")
+        .onTapGesture(perform: onOpen)
+        .help("Click: show usage in the panel")
     }
 }
