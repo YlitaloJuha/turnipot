@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in Turnipot doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! A security problem? Please don't open an issue: report it privately as [SECURITY.md](https://github.com/YlitaloJuha/turnipot/blob/main/docs/SECURITY.md) says.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: "I clicked Allow in the permission drop-down, but the terminal still showed Claude's prompt…"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a Claude Code session in VS Code's terminal
+        2. …
+  - type: input
+    id: turnipot
+    attributes:
+      label: Turnipot version
+      description: The ⚙ menu shows it, or `Turnipot --dump` (`app.version`).
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac
+      placeholder: "macOS 15.2, MacBook Pro 14-inch (notch)"
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: "`claude --version`"
+      placeholder: "2.1.0"
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where the session runs
+      multiple: true
+      options:
+        - Terminal app
+        - VS Code
+        - Cursor
+        - VSCodium
+        - Claude Desktop (Code tab)
+        - Other
+  - type: textarea
+    id: dump
+    attributes:
+      label: "`--dump` output (optional)"
+      description: |
+        Run `/Applications/Turnipot.app/Contents/MacOS/Turnipot --dump` and paste the output.
+        **Read it first:** it lists your session titles and project folders. Remove anything you don't want public.
+      render: json

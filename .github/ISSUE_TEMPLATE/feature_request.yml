@@ -1,0 +1,24 @@
+name: Feature request
+description: An idea for Turnipot. One per issue, please.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Asked already? Add 👍 to that issue's first post instead of opening a new one.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What's hard or missing today, and when you run into it.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How Turnipot could help. Sketches and screenshots welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do now instead

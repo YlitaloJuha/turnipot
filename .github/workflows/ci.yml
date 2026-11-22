@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE", ".github/ISSUE_TEMPLATE/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE", ".github/ISSUE_TEMPLATE/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and self-test
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Swift version
+        run: swift --version
+      - name: Build (debug, every product)
+        run: swift build
+      - name: Self-tests
+        # Plain executable (no XCTest with the Command Line Tools); exits non-zero on any failure.
+        # QuestionTests also runs the built turnipot-hook against a fake app socket.
+        run: .build/debug/turnipot-selftest
+      - name: Shell scripts parse
+        run: for f in scripts/*.sh; do sh -n "$f"; done
+      - name: Assemble Turnipot.app (release, ad-hoc signed)
+        run: scripts/build-app.sh

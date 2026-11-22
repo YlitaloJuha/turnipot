@@ -4,8 +4,8 @@ Turnipot is a small Mac app that puts Claude Code in the MacBook's notch. It's b
 
 ## Asking for features and reporting bugs
 
-- **A bug:** open an [issue](https://github.com/YlitaloJuha/turnipot/issues/new). Say what you did, what you expected and what happened, plus your macOS version, Mac model (notch or not), Turnipot version (⚙ menu) and Claude Code version. The output of `/Applications/Turnipot.app/Contents/MacOS/Turnipot --dump` helps a lot. Check it first: it lists your session titles and folders.
-- **A feature:** open an issue with the problem first, then your idea. One per issue.
+- **A bug:** open a [bug report](https://github.com/YlitaloJuha/turnipot/issues/new?template=bug_report.yml). Say what you did, what you expected and what happened, plus your macOS version, Mac model (notch or not), Turnipot version (⚙ menu) and Claude Code version. The output of `/Applications/Turnipot.app/Contents/MacOS/Turnipot --dump` helps a lot. Check it first: it lists your session titles and folders.
+- **A feature:** open a [feature request](https://github.com/YlitaloJuha/turnipot/issues/new?template=feature_request.yml) with the problem first, then your idea. One per issue.
 - **Asked already?** Add 👍 to the issue's first post instead of a new issue or a "+1" comment.
 - **A security problem:** never in an issue. See [SECURITY.md](SECURITY.md).
 
@@ -17,7 +17,7 @@ scripts/build-app.sh --open     # build build/Turnipot.app and launch it
 swift run turnipot-selftest     # the tests
 ```
 
-`swift test` doesn't work with the Command Line Tools alone (no XCTest), so the tests are a plain executable: `turnipot-selftest` prints each failure and exits non-zero if any check fails. For a quick look at every state without real sessions, use the demo and render modes in [DEVELOPMENT.md](DEVELOPMENT.md#debugging-and-renders).
+`swift test` doesn't work with the Command Line Tools alone (no XCTest), so the tests are a plain executable: `turnipot-selftest` prints each failure and exits non-zero if any check fails. CI (`.github/workflows/ci.yml`, on macOS) runs the same build and self-tests, checks that the scripts parse and assembles `Turnipot.app` for every push to `main` and every pull request; changes to docs only are skipped. For a quick look at every state without real sessions, use the demo and render modes in [DEVELOPMENT.md](DEVELOPMENT.md#debugging-and-renders).
 
 ## Code rules
 
