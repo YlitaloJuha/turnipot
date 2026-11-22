@@ -8,13 +8,12 @@ func registerDesktopSessionTests() {
     func ms(_ t: Double) -> Double { t * 1000 }
 
     // MARK: Record parsing
-    let full = #"{"sessionId":"local_c1","cliSessionId":"cli-c1","title":" Icons ","lastFocusedAt":5000,"lastActivityAt":4000,"isArchived":false,"spawnedFrom":{"sessionId":"local_p","sideSession":true}}"#
+    let full = #"{"sessionId":"local_c1","cliSessionId":"cli-c1","title":" Icons ","lastActivityAt":4000,"isArchived":false,"spawnedFrom":{"sessionId":"local_p","sideSession":true}}"#
     let r = CDS.Record.parse(Data(full.utf8))
     expectEqual(r?.localId, "local_c1", "desktop record: id")
     expectEqual(r?.cliSessionId, "cli-c1", "desktop record: cli id")
     expectEqual(r?.title, "Icons", "desktop record: title trimmed")
     expectEqual(r?.parentLocalId, "local_p", "desktop record: spawnedFrom parent")
-    expectEqual(r?.lastFocusedAt, Date(timeIntervalSince1970: 5), "desktop record: lastFocusedAt ms")
     check("desktop record: invalid id rejected", CDS.Record.parse(Data(#"{"sessionId":"x y"}"#.utf8)) == nil)
     check("desktop record: junk rejected", CDS.Record.parse(Data("nope".utf8)) == nil)
     expectEqual(CDS.Record.parse(Data(#"{"sessionId":"local_a","title":"","spawnedFrom":{"sessionId":"local_a"}}"#.utf8))?.parentLocalId,
@@ -22,12 +21,10 @@ func registerDesktopSessionTests() {
 
     // MARK: Snapshot
     let snap = CDS.Snapshot(records: [
-        .init(localId: "local_p", cliSessionId: "cli-p", title: "Parent", lastFocusedAt: Date(timeIntervalSince1970: 10)),
-        .init(localId: "local_c1", cliSessionId: "cli-c1", title: "Child", parentLocalId: "local_p",
-              lastFocusedAt: Date(timeIntervalSince1970: 30)),
+        .init(localId: "local_p", cliSessionId: "cli-p", title: "Parent"),
+        .init(localId: "local_c1", cliSessionId: "cli-c1", title: "Child", parentLocalId: "local_p"),
         .init(localId: "local_old", cliSessionId: "cli-c1", lastActivityAt: Date(timeIntervalSince1970: 99), isArchived: true),
     ])
-    expectEqual(snap.shownLocalId, "local_c1", "desktop snapshot: shown = last focused")
     let info = snap.info(cliSessionId: "cli-c1")
     expectEqual(info?.localId, "local_c1", "desktop snapshot: live record beats archived")
     expectEqual(info?.parentTitle, "Parent", "desktop snapshot: parent title")
@@ -78,30 +75,19 @@ func registerDesktopSessionTests() {
     let cyc = AttentionRules.groupedBySpawn([sess("A", local: "local_a", parent: "local_b"), sess("B", local: "local_b", parent: "local_a")])
     expectEqual(cyc.count, 2, "grouping: a parent cycle still shows every session once")
 
-    // MARK: Seen in Claude Desktop: only switching to the session there counts
+    // MARK: Claude Desktop records never mark a session seen
     MainActor.assumeIsolated {
-        func record(_ local: String, _ cli: String, focused: Double?) -> CDS.Record {
-            .init(localId: local, cliSessionId: cli, title: "T-\(cli)", lastFocusedAt: focused.map { Date(timeIntervalSince1970: $0) })
-        }
-        func shown(a: Double, b: Double) -> CDS.Snapshot {
-            CDS.Snapshot(records: [record("local_a", "A", focused: a), record("local_b", "B", focused: b)])
-        }
         let app = AppState()
         let now = Date(timeIntervalSince1970: 2_000)
         func desk(_ id: String, _ status: SessionStatus) -> ClaudeSession {
             ClaudeSession(pid: 1, host: .claudeDesktop, sessionId: id, cwd: "/x", name: id, status: status, startedAt: t0, updatedAt: t0)
         }
-        app.updateDesktopSessions(shown(a: 1_500, b: 1_000))    // Claude Desktop shows A
-        app.updateSessions([desk("A", .busy), desk("B", .busy)], now: now)
-        expectEqual(app.sessions.first { $0.sessionId == "A" }?.displayTitle, "T-A", "seen: Desktop title shown")
-        app.updateSessions([desk("A", .idle), desk("B", .idle)], now: now.addingTimeInterval(10))
-        check("seen: finishing while on screen still marks it", app.isUnseen("A") && app.isUnseen("B"))
-        app.updateDesktopSessions(shown(a: 2_015, b: 1_000))    // A's tab visible again, still A
-        check("seen: same session shown again doesn't count", app.isUnseen("A"))
-        app.updateDesktopSessions(shown(a: 2_015, b: 2_020))    // the user clicks B in the sidebar
-        check("seen: switching to it in Claude Desktop -> seen", !app.isUnseen("B"))
-        check("seen: the session switched away from stays marked", app.isUnseen("A"))
-        app.updateDesktopSessions(shown(a: 2_025, b: 2_020))    // and back to A
-        check("seen: switching back -> seen", !app.isUnseen("A"))
+        app.updateDesktopSessions(CDS.Snapshot(records: [.init(localId: "local_a", cliSessionId: "A", title: "T-A")]))
+        app.updateSessions([desk("A", .busy)], now: now)
+        expectEqual(app.sessions.first?.displayTitle, "T-A", "desktop: sidebar title shown")
+        app.updateSessions([desk("A", .idle)], now: now.addingTimeInterval(10))
+        app.updateDesktopSessions(CDS.Snapshot(records: [.init(localId: "local_a", cliSessionId: "A", title: "Renamed")]))
+        check("desktop: record updates keep the done mark", app.isUnseen("A"))
+        expectEqual(app.sessions.first?.displayTitle, "Renamed", "desktop: title follows Claude Desktop")
     }
 }

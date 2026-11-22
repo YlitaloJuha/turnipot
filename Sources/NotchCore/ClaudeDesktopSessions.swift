@@ -5,7 +5,6 @@ import Foundation
 ///   "sessionId": "local_<uuid>"          Claude Desktop's id (what its deep link takes)
 ///   "cliSessionId": "<uuid>"             the Claude Code session id Turnipot tracks
 ///   "title", "isArchived", "lastActivityAt" (ms)
-///   "lastFocusedAt" (ms)                 written each time the session's tab becomes visible
 ///   "spawnedFrom": {"sessionId": "local_…", "sideSession": true, …}   side sessions only
 /// None of this is documented, so every field is optional and anything unexpected is skipped.
 public enum ClaudeDesktopSessions {
@@ -22,14 +21,13 @@ public enum ClaudeDesktopSessions {
         public var cliSessionId: String?
         public var title: String?
         public var parentLocalId: String?
-        public var lastFocusedAt: Date?
         public var lastActivityAt: Date?
         public var isArchived: Bool
 
         public init(localId: String, cliSessionId: String? = nil, title: String? = nil, parentLocalId: String? = nil,
-                    lastFocusedAt: Date? = nil, lastActivityAt: Date? = nil, isArchived: Bool = false) {
+                    lastActivityAt: Date? = nil, isArchived: Bool = false) {
             self.localId = localId; self.cliSessionId = cliSessionId; self.title = title
-            self.parentLocalId = parentLocalId; self.lastFocusedAt = lastFocusedAt
+            self.parentLocalId = parentLocalId
             self.lastActivityAt = lastActivityAt; self.isArchived = isArchived
         }
 
@@ -46,7 +44,7 @@ public enum ClaudeDesktopSessions {
             return Record(localId: id, cliSessionId: obj["cliSessionId"] as? String,
                           title: title?.isEmpty == false ? title : nil,
                           parentLocalId: parent.flatMap { isLocalId($0) && $0 != id ? $0 : nil },
-                          lastFocusedAt: date("lastFocusedAt"), lastActivityAt: date("lastActivityAt"),
+                          lastActivityAt: date("lastActivityAt"),
                           isArchived: obj["isArchived"] as? Bool ?? false)
         }
 
@@ -62,28 +60,23 @@ public enum ClaudeDesktopSessions {
     public struct Snapshot: Equatable, Sendable {
         public var byLocalId: [String: Record]
         public var byCliSessionId: [String: Record]
-        /// The session Claude Desktop shows now: the one whose tab became visible last.
-        public var shownLocalId: String?
 
         public static let empty = Snapshot(records: [])
 
         public init(records: [Record]) {
             var local: [String: Record] = [:], cli: [String: Record] = [:]
-            var shown: Record?
             for r in records {
                 local[r.localId] = r
                 if let c = r.cliSessionId, !c.isEmpty, cli[c].map({ r.preferred(over: $0) }) ?? true { cli[c] = r }
-                if let f = r.lastFocusedAt, f > (shown?.lastFocusedAt ?? .distantPast) { shown = r }
             }
-            byLocalId = local; byCliSessionId = cli; shownLocalId = shown?.localId
+            byLocalId = local; byCliSessionId = cli
         }
 
         /// What the panel needs for a Claude Code session, or nil when Claude Desktop has no record.
         public func info(cliSessionId: String) -> DesktopSessionInfo? {
             guard let r = byCliSessionId[cliSessionId] else { return nil }
             return DesktopSessionInfo(localId: r.localId, title: r.title, parentLocalId: r.parentLocalId,
-                                      parentTitle: r.parentLocalId.flatMap { byLocalId[$0]?.title },
-                                      lastFocusedAt: r.lastFocusedAt)
+                                      parentTitle: r.parentLocalId.flatMap { byLocalId[$0]?.title })
         }
     }
 
@@ -157,12 +150,8 @@ public struct DesktopSessionInfo: Equatable, Sendable {
     /// The session that started this one as a side session, and its title.
     public var parentLocalId: String?
     public var parentTitle: String?
-    /// Last time its tab became visible in Claude Desktop.
-    public var lastFocusedAt: Date?
 
-    public init(localId: String, title: String? = nil, parentLocalId: String? = nil, parentTitle: String? = nil,
-                lastFocusedAt: Date? = nil) {
-        self.localId = localId; self.title = title; self.parentLocalId = parentLocalId
-        self.parentTitle = parentTitle; self.lastFocusedAt = lastFocusedAt
+    public init(localId: String, title: String? = nil, parentLocalId: String? = nil, parentTitle: String? = nil) {
+        self.localId = localId; self.title = title; self.parentLocalId = parentLocalId; self.parentTitle = parentTitle
     }
 }

@@ -230,28 +230,17 @@ public final class AppState: ObservableObject {
 
     // MARK: Inputs — Claude Desktop (via SessionMonitor / the app layer)
 
-    /// Claude Desktop's session records changed (titles, parents, which session it shows).
+    /// Claude Desktop's session records changed (titles, parents). Nothing here marks a session
+    /// seen: the done / waiting mark stays until it is cleared in Turnipot.
     public func updateDesktopSessions(_ snapshot: ClaudeDesktopSessions.Snapshot) {
-        let previouslyShown = desktopSnapshot.shownLocalId
         desktopSnapshot = snapshot
         var next = sessions
         for i in next.indices where next[i].host == .claudeDesktop {
             if let info = snapshot.info(cliSessionId: next[i].sessionId) { next[i].desktop = info }
         }
         if next != sessions { sessions = next }
-        // The user switched Claude Desktop to another session (an explicit click, like clicking
-        // its row here): that one has been seen. Merely having it on screen doesn't count, and
-        // neither does its tab becoming visible again (e.g. after unlocking the screen): the mark
-        // stays as the signal that the session wants attention.
-        if let shown = snapshot.shownLocalId, shown != previouslyShown {
-            for s in sessions where unseenFinishedAt[s.sessionId] != nil && s.desktop?.localId == shown {
-                markSeenInternal(s.sessionId)
-            }
-        }
         recomputeMode()
     }
-
-
 
     // MARK: Inputs — TranscriptReader (via SessionMonitor)
 
