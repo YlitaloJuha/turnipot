@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner-dark.svg">
-    <img alt="Turnipot: Claude Code, right in your MacBook's notch. A notch panel lists three sessions with their context sizes and usage bars, and a drop-down asks to allow a Bash command" src="docs/brand/banner.svg" width="100%">
+    <img alt="Turnipot: Claude Code, right in your MacBook's notch. The top of a MacBook screen: the Turnipot panel opens out of the notch with three sessions, their context sizes and usage bars, and a drop-down below asks to allow a Bash command" src="docs/brand/banner.svg" width="100%">
   </picture>
 </p>
 
