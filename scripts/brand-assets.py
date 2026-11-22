@@ -202,10 +202,10 @@ def left_copy(s, c, x=96, top=100, dark=True, chips=("Sessions & usage", "Permis
         cx += w + 10
 
 
-def banner(dark):
+def banner(dark, H=760):
     """Logo and headline centred on top; the top of a MacBook below (bezel, menu bar, notch), with
     the panel open at the notch and a permission drop-down under it. Cropped at the bottom."""
-    W, H = 1600, 760
+    W = 1600
     c = palette(dark)
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">', defs(dark),
          f'<rect width="{W}" height="{H}" fill="{c["bg"]}"/>']
@@ -229,6 +229,9 @@ with open(os.path.join(OUT, "banner.svg"), "w") as f:
     f.write(banner(False))
 with open(os.path.join(OUT, "banner-dark.svg"), "w") as f:
     f.write(banner(True))
+# GitHub social preview (Settings → General → Social preview): the dark banner at 2:1, 1280 × 640.
+with open(os.path.join(OUT, "social-preview.svg"), "w") as f:
+    f.write(banner(True, H=800).replace('width="1600" height="800"', 'width="1280" height="640"', 1))
 with open(os.path.join(OUT, "mark.svg"), "w") as f:
     f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 80 80">{mark(80)}</svg>')
 print("ok")

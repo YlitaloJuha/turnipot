@@ -212,7 +212,7 @@ Offscreen renders (`--render`) can't draw AppKit-backed views, so the reader's s
 
 ## Brand assets
 
-`docs/brand/` holds the README banner (`banner.svg` light, `banner-dark.svg` dark) and the mark (`mark.svg`, `mark-512.png`: the turnip in its pot on a black tile). `python3 scripts/brand-assets.py docs/brand` writes the SVGs; the pixel art copies `TurnipRig`'s grids and colours, so update both together. The banner shows the top of a MacBook (bezel, menu bar, notch) with the panel and a permission drop-down; they are drawn, not rendered, with demo data only and no Apple logo.
+`docs/brand/` holds the README banner (`banner.svg` light, `banner-dark.svg` dark) and the mark (`mark.svg`, `mark-512.png`: the turnip in its pot on a black tile). `social-preview.png` (1280 × 640, from `social-preview.svg`, the dark banner at 2:1) is uploaded by hand under the repository's Settings → General → Social preview; GitHub has no API for it. `python3 scripts/brand-assets.py docs/brand` writes the SVGs; the pixel art copies `TurnipRig`'s grids and colours, so update both together. The banner shows the top of a MacBook (bezel, menu bar, notch) with the panel and a permission drop-down; they are drawn, not rendered, with demo data only and no Apple logo.
 
 ## Exporting the README media
 
