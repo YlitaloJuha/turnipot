@@ -72,7 +72,7 @@ struct CollapsedView: View {
     }
 
     @ViewBuilder private var rightWing: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: PillLayout.usageGap) {
             if let w = appState.usage.nearLimitWindow {
                 Text("\(w.percent)% \(Fmt.usageShortLabel(w.label))")
                     .font(.system(size: 12, weight: .medium).monospacedDigit())
@@ -99,7 +99,7 @@ struct CollapsedView: View {
                     .transition(.opacity)
             }
         }
-        .padding(.trailing, 10)
+        .padding(.trailing, PillLayout.rightTrailingPad)
     }
 }
 
