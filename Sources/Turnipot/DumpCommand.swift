@@ -119,10 +119,21 @@ enum DumpCommand {
                 ],
             ]
             d["shellPid"] = s.shellPid.map { Int($0) } ?? NSNull()
-            // "terminal" (editor extension) or "claudeDesktop"; entrypoint as written by Claude Code.
+            // "terminal" or "claudeDesktop"; entrypoint as written by Claude Code.
             d["host"] = s.host.rawValue
             d["entrypoint"] = f.entrypoint ?? NSNull()
-            d["focus"] = s.host == .claudeDesktop ? "open -b \(NotchConstants.claudeDesktopBundleId)" : "editor extension (shellPid)"
+            // Where focus / quick reply go (see TerminalBridge): Terminal / iTerm2 by tty, else the
+            // editor extension by shellPid, falling back to activating the app in the parent chain.
+            let loc = s.host == .terminal ? NativeTerminal.locate(pid: s.pid) : nil
+            d["terminalApp"] = loc?.appPath ?? NSNull()
+            d["tty"] = loc?.tty ?? NSNull()
+            if s.host == .claudeDesktop {
+                d["focus"] = "open -b \(NotchConstants.claudeDesktopBundleId)"
+            } else if let loc, let t = loc.terminal {
+                d["focus"] = "\(t.displayName) AppleScript (tty)"
+            } else {
+                d["focus"] = loc.map { "editor extension (shellPid), else open -a \($0.appPath)" } ?? "editor extension (shellPid)"
+            }
             d["quickReply"] = s.host == .terminal
             d["model"] = s.model ?? NSNull()
             d["version"] = s.version ?? NSNull()

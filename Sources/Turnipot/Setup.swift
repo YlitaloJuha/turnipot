@@ -296,11 +296,11 @@ enum SetupActions {
         guard !withCli.isEmpty else {
             let noCli = found.map(\.editor.appName)
             ui.confirm(noCli.isEmpty ? "No VSCodium, VS Code or Cursor found" : "Can't reach \(noCli.joined(separator: ", "))'s command line tool",
-                       detail: noCli.isEmpty ? nil : "Use scripts/install-extension.sh --copy", tone: .bad, duration: 4)
+                       detail: noCli.isEmpty ? nil : "Install turnipot-bridge.vsix from the release: Extensions → Install from VSIX…", tone: .bad, duration: 4)
             return
         }
         var lines = ["Installs the Turnipot Bridge into \(names) with their command line tools.",
-                     "It lets Turnipot focus a session's terminal and type quick replies into it."]
+                     "It lets Turnipot focus a session's integrated terminal and type quick replies into it (Terminal and iTerm2 work without it)."]
         let skipped = found.filter { $0.cli == nil }.map(\.editor.appName)
         if !skipped.isEmpty { lines.append("Skips \(skipped.joined(separator: ", ")) (no command line tool found).") }
         lines.append("Reload the editor windows afterwards.")

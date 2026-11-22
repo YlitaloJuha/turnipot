@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+**Terminal and iTerm2**
+- Click a session running in Terminal or iTerm2 to bring its tab forward, and send quick replies into it. Nothing to install: macOS asks once per app whether Turnipot may control it (the app now has the Apple Events entitlement for this).
+- Sessions in other apps (Ghostty, Warp, WezTerm, or an editor without the extension) bring that app to the front when clicked.
+
+**Releases**
+- The editor extension is attached to each release as `turnipot-bridge-<version>.vsix`, and the release notes start with the install steps.
+
 ## 0.4.0
 
 **Signed and notarized**

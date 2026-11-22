@@ -20,7 +20,7 @@ The latest release, and the latest commit on `main`. Fixes ship as a new release
 - **No accidental approvals.** A new drop-down ignores clicks and keys for 400 ms, so a click meant for something else can't approve it, and its hot keys (⌘↩ / esc) work only after the pointer has moved onto it. "Always allow" adds Claude's own suggested rule, never a guessed wider one.
 - **No typing into a prompt.** Quick reply is paused for a session while Claude may be showing its own prompt in that terminal, so your Enter can't pick one of its options.
 - **Your settings file is backed up.** Installing or removing the hook shows what will change in `~/.claude/settings.json`, writes a backup first, and replaces the file atomically.
-- **Signed and notarized.** Releases are signed with a Developer ID, use the hardened runtime with no entitlements, and are notarized by Apple. Each release lists the zip's SHA-256.
+- **Signed and notarized.** Releases are signed with a Developer ID, use the hardened runtime with a single entitlement (Apple Events, to select a session's tab in Terminal / iTerm2 and type quick replies there; macOS asks you first), and are notarized by Apple. Each release lists the zip's SHA-256.
 
 ## What you trust
 
