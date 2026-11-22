@@ -22,40 +22,77 @@ public extension TerminalControlling {
     }
 }
 
-/// Talks to the VSCodium companion extension over
-/// ~/Library/Application Support/Turnipot/vscode-<pid>.sock (newline JSON, BridgeRequest -> BridgeResponse).
+/// Focuses / types into a session's terminal:
+/// - Terminal and iTerm2 (found in the claude process's parent chain): AppleScript addressed by
+///   the session's tty (`NativeTerminal`), then `open -b` brings the app forward.
+/// - Everything else: the VS Code-family companion extension over
+///   ~/Library/Application Support/Turnipot/vscode-<editor>-<pid>.sock (newline JSON,
+///   BridgeRequest -> BridgeResponse). When no extension answers, focus still brings forward the
+///   app the session runs in (Ghostty, Warp, an editor without the extension, …).
 public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
+    public typealias Locator = @Sendable (_ pid: Int32) -> NativeTerminal.Location?
+    public typealias ScriptRunner = @Sendable (_ script: String, _ arguments: [String]) -> NativeTerminal.ScriptResult
+    public typealias Opener = @Sendable (_ openArguments: [String]) -> Void
+
     public let runtimeDir: URL
     /// Activates Claude Desktop (injectable so tests never launch it).
     let desktopActivator: @Sendable () -> Void
     /// Sessions whose terminal may be showing a Claude dialog (kept in sync by AppState):
     /// `send` refuses them, since the reply's Enter would pick the dialog's highlighted option.
     public let sendGate: TerminalSendGate
+    /// Where a claude pid's terminal lives (injectable: tests never inspect real processes).
+    let locator: Locator
+    /// Runs AppleScript for Terminal / iTerm2 (injectable: tests never run osascript).
+    let scriptRunner: ScriptRunner
+    /// `/usr/bin/open <args>` (injectable: tests never activate apps).
+    let opener: Opener
 
     public init(runtimeDir: URL = NotchPaths.runtimeDir,
                 sendGate: TerminalSendGate = TerminalSendGate(),
-                desktopActivator: @escaping @Sendable () -> Void = { TerminalBridge.activateClaudeDesktopApp() }) {
+                desktopActivator: @escaping @Sendable () -> Void = { TerminalBridge.activateClaudeDesktopApp() },
+                locator: @escaping Locator = { NativeTerminal.locate(pid: $0) },
+                scriptRunner: @escaping ScriptRunner = { NativeTerminal.runScript($0, arguments: $1) },
+                opener: @escaping Opener = { TerminalBridge.runOpen($0) }) {
         self.runtimeDir = runtimeDir
         self.sendGate = sendGate
         self.desktopActivator = desktopActivator
+        self.locator = locator
+        self.scriptRunner = scriptRunner
+        self.opener = opener
     }
 
-    /// Sends {"type":"focus","shellPid":N} to each editor window's socket until one owns the
-    /// terminal, then activates that editor (VSCodium / VS Code / Cursor — the extension reports
-    /// its app bundle). Returns false if session.shellPid is nil or nobody answered ok.
+    /// Terminal / iTerm2: select the session's tab and raise its window, then activate the app
+    /// (also when the script can't run, e.g. Automation permission denied: the app still comes
+    /// forward). Otherwise sends {"type":"focus","shellPid":N} to each editor window's socket
+    /// until one owns the terminal and activates that editor; with no answer, activates the app
+    /// found in the parent chain. Returns false only when nothing could be brought forward.
     public func focus(session: ClaudeSession) async -> Bool {
         // Claude Desktop sessions have no terminal (shellPid is its `disclaimer` helper).
         if session.host == .claudeDesktop { return await activateClaudeDesktop(session: session) }
-        guard let shellPid = session.shellPid else { return false }
-        guard let r = await broadcastResponse(.focus(shellPid: shellPid)) else { return false }
-        // Only an editor that answered gets activated, so nothing is ever cold-launched.
-        // Older extension builds don't report appPath: they only ran in VSCodium.
-        Self.activateEditor(appPath: r.appPath)
+        let location = await offMain { [locator] in locator(session.pid) }
+        if let location, let terminal = location.terminal {
+            if let tty = location.tty {
+                let script = terminal.focusScript()
+                _ = await offMain { [scriptRunner] in scriptRunner(script, [tty]) }
+            }
+            await offMain { [opener] in opener(["-b", terminal.bundleId]) }
+            return true
+        }
+        if let shellPid = session.shellPid, let r = await broadcastResponse(.focus(shellPid: shellPid)) {
+            // Only an editor that answered gets activated, so nothing is ever cold-launched.
+            // Older extension builds don't report appPath: they only ran in VSCodium.
+            let opener = self.opener
+            await offMain { Self.activateEditor(appPath: r.appPath, opener: opener) }
+            return true
+        }
+        guard let location else { return false }
+        await offMain { [opener] in opener(["-a", location.appPath]) }
         return true
     }
 
-    /// Sends {"type":"send","shellPid":N,"text":...} to each socket until ok.
-    /// Not possible for Claude Desktop sessions (returns false without touching any socket).
+    /// Terminal / iTerm2: types the reply as a bracketed paste plus Return (AppleScript).
+    /// Otherwise sends {"type":"send","shellPid":N,"text":...} to each editor socket until ok.
+    /// Not possible for Claude Desktop sessions (returns false without touching anything).
     public func send(session: ClaudeSession, text: String) async -> Bool {
         guard session.host == .terminal else { return false }
         guard !sendGate.isBlocked(session.sessionId) else { return false }
@@ -64,7 +101,20 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
         // the shell has the terminal and the reply + Enter would run as a shell command.
         guard let job = Self.jobState(pid: session.pid),
               Self.isForegroundJob(pgid: job.pgid, tpgid: job.tpgid, stopped: job.stopped) else { return false }
+        let location = await offMain { [locator] in locator(session.pid) }
+        if let location, let terminal = location.terminal {
+            guard let tty = location.tty else { return false }
+            let script = terminal.sendScript(reply: text)
+            return await offMain { [scriptRunner] in scriptRunner(script, [tty]) } == .ok
+        }
         return await broadcast(.send(shellPid: shellPid, text: text))
+    }
+
+    /// Runs blocking work (sysctl walks, osascript, open) off the caller's executor.
+    private func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { (cont: CheckedContinuation<T, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async { cont.resume(returning: work()) }
+        }
     }
 
     /// True unless the process is stopped or another process group (e.g. the shell after ^Z) is
@@ -144,11 +194,11 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
     /// Bring the editor app to the front: `/usr/bin/open -a <appPath>` (or `-b com.vscodium` when
     /// the extension didn't say). `open` is a plain CLI, so no Dock icon flashes; keeps NotchCore
     /// free of AppKit.
-    public static func activateEditor(appPath: String?) {
+    public static func activateEditor(appPath: String?, opener: Opener = { runOpen($0) }) {
         if let appPath, appPath.hasSuffix(".app"), FileManager.default.fileExists(atPath: appPath) {
-            runOpen(["-a", appPath])
+            opener(["-a", appPath])
         } else {
-            runOpen(["-b", NotchConstants.vscodiumBundleId])
+            opener(["-b", NotchConstants.vscodiumBundleId])
         }
     }
 
@@ -158,7 +208,7 @@ public final class TerminalBridge: TerminalControlling, @unchecked Sendable {
         runOpen(["-b", NotchConstants.claudeDesktopBundleId])
     }
 
-    static func runOpen(_ arguments: [String]) {
+    public static func runOpen(_ arguments: [String]) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         p.arguments = arguments

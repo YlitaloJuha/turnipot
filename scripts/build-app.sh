@@ -58,6 +58,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>Turnipot selects the Claude Code session's tab in Terminal or iTerm2 when you click it, and types your quick replies into it.</string>
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict>
@@ -65,8 +66,19 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Inside out: the helper first, then the app (no --deep). The app has no entitlements: it sends no
-# Apple Events and loads no third-party code, so the hardened runtime needs no exceptions.
+# Inside out: the helper first, then the app (no --deep). The app's only entitlement is Apple Events
+# (it scripts Terminal / iTerm2 through osascript to focus a session's tab and type quick replies;
+# macOS asks once per terminal app). It loads no third-party code; the hook has no entitlements.
+ENTITLEMENTS="$ROOT/build/Turnipot.entitlements"
+cat > "$ENTITLEMENTS" <<ENT
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.automation.apple-events</key><true/>
+</dict>
+</plist>
+ENT
 if [ -n "$SIGN_IDENTITY" ]; then
   echo "==> codesign ($SIGN_IDENTITY, hardened runtime)"
   set -- --force --options runtime --timestamp --sign "$SIGN_IDENTITY"
@@ -75,7 +87,7 @@ else
   set -- --force --sign -
 fi
 codesign "$@" --identifier "$BUNDLE_ID.hook" "$APP/Contents/Helpers/turnipot-hook" >/dev/null
-codesign "$@" "$APP" >/dev/null
+codesign "$@" --entitlements "$ENTITLEMENTS" "$APP" >/dev/null
 codesign --verify --deep --strict "$APP"
 
 echo "==> built $APP (version $VERSION)"

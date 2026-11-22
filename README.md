@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 14 Sonoma or later" src="https://img.shields.io/badge/macOS-14%2B%20Sonoma-d97757?style=flat-square">
   <img alt="For Claude Code" src="https://img.shields.io/badge/Claude%20Code-hook%20%2B%20transcripts-d97757?style=flat-square">
-  <img alt="Editors: VS Code, Cursor and VSCodium" src="https://img.shields.io/badge/editors-VS%20Code%20%C2%B7%20Cursor%20%C2%B7%20VSCodium-d97757?style=flat-square">
+  <img alt="Terminals: Terminal, iTerm2, VS Code, Cursor and VSCodium" src="https://img.shields.io/badge/terminals-Terminal%20%C2%B7%20iTerm2%20%C2%B7%20VS%20Code%20%C2%B7%20Cursor%20%C2%B7%20VSCodium-d97757?style=flat-square">
   <img alt="Claude Desktop sessions too" src="https://img.shields.io/badge/Claude%20Desktop-Code%20tab-d97757?style=flat-square">
   <img alt="Runs locally, no telemetry" src="https://img.shields.io/badge/privacy-local%20only-d97757?style=flat-square">
   <img alt="Signed and notarized" src="https://img.shields.io/badge/signed-notarized-d97757?style=flat-square">
@@ -72,8 +72,9 @@ When a session finishes, the notch drops down with Claude's last sentence and a 
 <p align="center"><img src="docs/media/finished.gif" width="820" alt="A session finishes: the drop-down shows the last reply and the turnip springs out of its pot"></p>
 <p align="center"><img src="docs/media/away.png" width="820" alt="While you were away: one session asked something, two finished"></p>
 
-### Works with your editor and Claude Desktop
+### Works with your terminal, editor and Claude Desktop
 
+- **Terminal and iTerm2:** click a session to bring its tab forward, or send a quick reply into it. Nothing to install: the first time, macOS asks whether Turnipot may control Terminal (or iTerm2). Other terminal apps (Ghostty, Warp, WezTerm, …) are brought to the front when you click a session, without picking the tab, and quick reply isn't available there. Sessions inside tmux or over ssh can't be located.
 - **VSCodium, VS Code and Cursor:** click a session to jump straight to its integrated terminal (the right window comes forward), or send a quick reply into it. Uses a tiny bundled bridge extension.
 - **Claude Desktop:** sessions from the Code tab show up too; clicking one brings Claude Desktop forward.
 
@@ -95,7 +96,8 @@ Feel it as well as see it: a light tick as the pointer moves over sessions and b
 2. Open it. Releases are signed with a Developer ID and notarized by Apple, so macOS opens them with a double-click. (0.3.0 and earlier were not: for those, right-click → Open → Open the first time.)
 3. Set it up from the notch: hover it, click ⚙ (or right-click the notch) and choose
    - **Install Claude Code hook…** to answer permissions, questions and plans from the notch. It shows what will change in `~/.claude/settings.json` and backs the file up first. Choose it again later to remove the hook.
-   - **Install editor extension…** for jump-to-terminal and quick replies in VSCodium, VS Code or Cursor (installed with each editor's command line tool; reload the editor windows afterwards).
+   - **Install editor extension…** for jump-to-terminal and quick replies in VSCodium, VS Code or Cursor (installed with each editor's command line tool; reload the editor windows afterwards). If the app can't find your editor (it looks in /Applications and ~/Applications), download `turnipot-bridge-<version>.vsix` from the same release and in the editor choose Extensions → ⋯ → **Install from VSIX…**.
+   - Sessions in **Terminal** and **iTerm2** need no extension. The first time you click one (or send it a quick reply), macOS asks whether Turnipot may control that app; allow it.
    - **Launch at login**. The first time, macOS may ask you to allow it under System Settings → General → Login Items.
 
 ### Build from source
@@ -114,7 +116,7 @@ A build from source is signed ad hoc, which is fine on the Mac that built it. `i
 - A MacBook with a notch. Macs without one get a small pill at the top centre of the screen.
 - [Claude Code](https://code.claude.com) installed
 - To build from source: the Xcode Command Line Tools (`xcode-select --install`); Xcode itself isn't needed
-- Optional: VSCodium, VS Code or Cursor for jump-to-terminal and quick replies
+- Jump-to-terminal and quick replies work in Terminal and iTerm2 as they are, and in VSCodium, VS Code or Cursor with the bundled extension
 
 ## Privacy
 
@@ -124,12 +126,13 @@ Everything runs locally on your Mac:
 - Usage numbers come from running your own `claude -p "/usage"` every two minutes. It doesn't call a model.
 - The only network request Turnipot makes is the update check: once at launch and once a day, an anonymous `GET https://api.github.com/repos/YlitaloJuha/turnipot/releases/latest` (User-Agent `Turnipot/<version>`, no cookies, nothing about you or your sessions). Turn it off with ⚙ → **Check for updates**. There's no telemetry or analytics, and it doesn't read keychain items or OAuth tokens.
 - The hook and the editor extension talk to the app over Unix sockets in `~/Library/Application Support/Turnipot/` (mode 0600).
+- For sessions in Terminal or iTerm2, Turnipot runs a short AppleScript (`osascript`) when you click a session or send a quick reply: it finds the tab by the session's tty, selects it, and types your reply. macOS asks for this Automation permission once per terminal app; you can revoke it in System Settings → Privacy & Security → Automation. Nothing is read from your terminals.
 
 ## How it works
 
 - **Sessions and usage:** Turnipot polls `~/.claude/sessions/*.json`, reads the tail of each transcript for titles, context size, the last reply and subagents, and parses `claude -p "/usage"`.
 - **Permissions, questions, plans:** a tiny hook binary (`turnipot-hook`) runs for Claude Code's `PermissionRequest` event and asks the app over a socket. If the app isn't running or you don't answer, the hook steps aside and Claude shows its normal terminal prompt.
-- **Editors:** the bridge extension lets the app focus a session's integrated terminal and type a reply into it.
+- **Terminals:** Turnipot finds the app a session runs in from the `claude` process's parents. Terminal and iTerm2 are scripted by tty (select the tab, type the reply as a bracketed paste plus Return); in VS Code-family editors the bridge extension focuses the integrated terminal and types into it; any other app is just brought to the front.
 
 The details, including the exact hook I/O, are in [CONTRACTS.md](CONTRACTS.md). For build flags, demo and render modes, `--dump`, media export and the full behaviour reference, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 

@@ -8,10 +8,11 @@
 #   build/Turnipot-<version>.dmg.sha256  "<sha256>  Turnipot-<version>.dmg"
 #   build/Turnipot-<version>.zip         Turnipot.app (ditto -c -k --keepParent)
 #   build/Turnipot-<version>.zip.sha256  "<sha256>  Turnipot-<version>.zip"
-#   build/release-notes-<version>.md     the "## <version>" section of CHANGELOG.md
+#   build/turnipot-bridge-<ext>.vsix     the editor extension, as bundled in the app (<ext> = its own version)
+#   build/release-notes-<version>.md     install steps + the "## <version>" section of CHANGELOG.md
 #
-#   --publish  also create the GitHub release v<version> (YlitaloJuha/turnipot) with the dmg, the zip
-#              and their checksums attached and the CHANGELOG section as notes. Needs gh logged in as YlitaloJuha;
+#   --publish  also create the GitHub release v<version> (YlitaloJuha/turnipot) with the dmg, the zip,
+#              their checksums and the .vsix attached and the release notes above. Needs gh logged in as YlitaloJuha;
 #              refuses if the tag already exists or the working tree has uncommitted changes.
 #
 # The version comes from the VERSION file.
@@ -50,7 +51,24 @@ if [ ! -s "$NOTES.tmp" ]; then
   exit 1
 fi
 mkdir -p build
-mv "$NOTES.tmp" "$NOTES"
+EXT_VERSION="$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['version'])" vscode-extension/package.json)"
+VSIX="build/turnipot-bridge-$EXT_VERSION.vsix"
+# Install steps first (people often land on the release page from a link), then the changelog.
+{
+  cat <<EOF_NOTES
+**Install**
+1. Download \`Turnipot-$VERSION.dmg\` below, open it and drag **Turnipot** onto **Applications**, then open it from Applications. It lives in the notch (no Dock icon).
+2. Hover the notch, click ⚙ (or right-click the notch) and choose **Install Claude Code hook…** to answer permissions, questions and plans from the notch, and **Install editor extension…** for jump-to-terminal and quick replies in VSCodium, VS Code or Cursor (reload the editor windows afterwards). Sessions in Terminal and iTerm2 need no extension: the first time you click one, macOS asks whether Turnipot may control that app. Turn on **Launch at login** there too.
+3. If the app can't install the editor extension (it looks for the editor in /Applications or ~/Applications), download \`turnipot-bridge-$EXT_VERSION.vsix\` below and in the editor choose Extensions → ⋯ → **Install from VSIX…**.
+
+More in the [README](https://github.com/$REPO#install).
+
+---
+
+EOF_NOTES
+  cat "$NOTES.tmp"
+} > "$NOTES"
+rm -f "$NOTES.tmp"
 
 if [ "$PUBLISH" -eq 1 ] && [ -n "$(git status --porcelain)" ]; then
   echo "Uncommitted changes; commit before publishing." >&2
@@ -82,6 +100,10 @@ if [ "$BUILT" != "$VERSION" ]; then
   exit 1
 fi
 codesign --verify --deep --strict "$APP"
+if ! cmp -s "$VSIX" "$APP/Contents/Resources/turnipot-bridge.vsix"; then
+  echo "$VSIX differs from the extension bundled in the app." >&2
+  exit 1
+fi
 for bin in "$APP" "$APP/Contents/Helpers/turnipot-hook"; do
   if ! codesign -dv "$bin" 2>&1 | grep -q 'flags=.*runtime'; then
     echo "$bin is not signed with the hardened runtime." >&2
@@ -140,6 +162,7 @@ spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG
 (cd build && shasum -a 256 "Turnipot-$VERSION.dmg" > "Turnipot-$VERSION.dmg.sha256")
 echo "    $(cat "$DMG.sha256")"
 echo "    size: $(du -h "$DMG" | cut -f1)"
+echo "    extension: $VSIX"
 echo "    notes: $NOTES"
 
 if [ "$PUBLISH" -eq 0 ]; then
@@ -154,6 +177,6 @@ if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   echo "Release $TAG already exists." >&2
   exit 1
 fi
-gh release create "$TAG" "$DMG" "$DMG.sha256" "$ZIP" "$ZIP.sha256" \
+gh release create "$TAG" "$DMG" "$DMG.sha256" "$ZIP" "$ZIP.sha256" "$VSIX" \
   --repo "$REPO" --title "Turnipot $VERSION" --notes-file "$NOTES" --target "$(git rev-parse HEAD)"
 echo "Published https://github.com/$REPO/releases/tag/$TAG"

@@ -76,7 +76,7 @@ func registerHostTests() {
     defer { if listener >= 0 { close(listener) } }
     check("bridge: test listener up", listener >= 0)
     let activations = Counter()
-    let bridge = TerminalBridge(runtimeDir: rt, desktopActivator: { activations.bump() })
+    let bridge = TerminalBridge(runtimeDir: rt, desktopActivator: { activations.bump() }, locator: { _ in nil })
     let now = Date()
     let desk = ClaudeSession(pid: 3270, shellPid: 3269, host: .claudeDesktop, sessionId: "D", cwd: "/x",
                              name: "d", status: .idle, startedAt: now, updatedAt: now)
