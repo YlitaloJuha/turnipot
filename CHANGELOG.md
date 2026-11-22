@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+**Claude Desktop**
+- Side sessions sit indented under the session that started them, as in Claude Desktop's sidebar, and Claude Desktop sessions show their sidebar title. Hover a side session to see which session it came from.
+- A session marked done or waiting is cleared when you switch to it in Claude Desktop's sidebar, just as clicking its row in Turnipot does. Having it on screen doesn't clear the mark, so it stays as the signal that the session wants attention.
+
 ## 0.5.1
 
 **Claude Desktop**

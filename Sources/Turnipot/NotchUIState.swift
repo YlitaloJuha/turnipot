@@ -400,6 +400,11 @@ enum ExpandedMetrics {
     static let titleFont = NSFont.systemFont(ofSize: 13, weight: .semibold)
     static let snippetFont = NSFont.systemFont(ofSize: 11)
 
+    /// Indent per side-session level (Claude Desktop), and the deepest level drawn.
+    static let indentStep: CGFloat = 14
+    static let maxIndentDepth = 2
+    static func indent(depth: Int) -> CGFloat { CGFloat(min(max(depth, 0), maxIndentDepth)) * indentStep }
+
     /// Width of a row's text column (title + sprouts / last sentence).
     static var rowTextWidth: CGFloat {
         replyFieldWidth - (3 + 10 + 4 + contextWidth + buttonsWidth + timeWidth + 6 * rowSpacing + rowTrailing)
@@ -419,10 +424,11 @@ enum ExpandedMetrics {
     static func revealExtra(_ s: ClaudeSession, appState: AppState, ui: NotchUIState) -> CGFloat {
         guard ui.revealedRowId == s.sessionId else { return 0 }
         let running = appState.subagents(for: s.sessionId).runningCount
-        let title = revealLines(s.displayTitle, font: titleFont, width: rowTextWidth - (running > 0 ? 6 + SproutPips.width(running: running) : 0))
+        let width = rowTextWidth - indent(depth: appState.panelRows.first { $0.id == s.sessionId }?.depth ?? 0)
+        let title = revealLines(s.displayTitle, font: titleFont, width: width - (running > 0 ? 6 + SproutPips.width(running: running) : 0))
         var extra = CGFloat(title.lines - 1) * title.lineHeight
         if appState.panelHighlightIds.contains(s.sessionId) {
-            let snip = revealLines(SessionRow.snippet(s), font: snippetFont, width: rowTextWidth)
+            let snip = revealLines(SessionRow.snippet(s), font: snippetFont, width: width)
             extra += CGFloat(snip.lines - 1) * snip.lineHeight
         }
         return extra
