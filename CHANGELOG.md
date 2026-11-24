@@ -3,6 +3,11 @@
 ## 0.7.1
 
 - Trackpad haptics are quieter: the hover tick now only comes on action buttons (Allow, Deny, question options, prompt buttons), not on session rows, links or the small icons. The open tap, needs-you taps and turn-end burst are unchanged.
+- Clicking the "finished" drop-down to open the session now closes the notch, instead of leaving the session list open behind it. The separate "open ↗" label is gone: the whole drop-down is the button.
+- The drop-down's **Read** button is bigger and sits at the bottom center with a down arrow, like a handle: it opens the whole reply right there.
+- Claude Desktop sessions say why there's no reply field: quick reply works in terminal sessions only (Claude Desktop doesn't accept text from other apps), next to **Reply in Claude ↗**.
+- The action buttons in the needs-you drop-downs moved to the right, with the main one last: **Deny · Always allow · Allow**, **Keep planning… · Approve**, **‹ Back · Submit**. **Open session ↗** / **Answer in terminal ↗** moved to the left.
+- With no sessions, the idle pill drops the "0" and only sticks out on the turnip's side of the notch.
 
 ## 0.7.0
 

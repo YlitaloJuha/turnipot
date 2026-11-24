@@ -83,7 +83,8 @@ enum MediaExport {
         var collapsed: Presentation { .collapsed(wing: PillLayout.wing(appState: app, ui: ui)) }
         var current: Presentation { Presentation.current(appState: app, ui: ui) }
         func shape(_ p: Presentation) -> IslandShapeState {
-            IslandShapeState(size: p.bodySize(appState: app, ui: ui), radius: p.bottomRadius)
+            IslandShapeState(size: p.bodySize(appState: app, ui: ui), radius: p.bottomRadius,
+                             rightTrim: p.rightTrim(appState: app))
         }
         func still(_ p: Presentation, mascotTime: Double? = nil) -> IslandFrameOverride {
             var o = IslandFrameOverride(shape: shape(p), content: p, contentOpacity: 1)

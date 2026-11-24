@@ -24,7 +24,7 @@ struct NotchGeometry: Equatable {
     /// Wing width when idle: pill barely wider than the notch (mockup state 1).
     static let idleWingWidth: CGFloat = 44
     /// Drop-down sizes. Heights here are the body below the notch strip (see islandSize).
-    static let finishedSize = CGSize(width: 540, height: 124)
+    static let finishedSize = CGSize(width: 540, height: 148)   // incl. the bottom "Read ⌄" row
     static let finishedCompactSize = CGSize(width: 420, height: 34)
     static let permissionSize = CGSize(width: 560, height: 114)
     static let expandedSize = CGSize(width: 600, height: 440)   // max; actual height is content-driven
@@ -135,10 +135,10 @@ struct NotchGeometry: Equatable {
     }
 
     /// Screen rect of an island with the given body size (shoulders included).
-    func islandScreenRect(bodySize: CGSize) -> CGRect {
+    func islandScreenRect(bodySize: CGSize, rightTrim: CGFloat = 0) -> CGRect {
         let w = bodySize.width + 2 * Self.shoulderRadius
         return CGRect(x: notchRect.midX - w / 2, y: screenFrame.maxY - bodySize.height,
-                      width: w, height: bodySize.height)
+                      width: max(0, w - rightTrim), height: bodySize.height)
     }
 }
 
@@ -153,23 +153,27 @@ struct NotchShape: Shape {
     var bodyHeight: CGFloat
     var shoulderRadius: CGFloat
     var bottomRadius: CGFloat
+    /// Right edge pulled in by this much (one-sided idle pill); the left edge stays put.
+    var rightTrim: CGFloat = 0
 
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(AnimatablePair(bodyWidth, bodyHeight), AnimatablePair(shoulderRadius, bottomRadius)) }
+    var animatableData: AnimatablePair<AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>>, CGFloat> {
+        get { AnimatablePair(AnimatablePair(AnimatablePair(bodyWidth, bodyHeight), AnimatablePair(shoulderRadius, bottomRadius)), rightTrim) }
         set {
-            bodyWidth = newValue.first.first
-            bodyHeight = newValue.first.second
-            shoulderRadius = newValue.second.first
-            bottomRadius = newValue.second.second
+            bodyWidth = newValue.first.first.first
+            bodyHeight = newValue.first.first.second
+            shoulderRadius = newValue.first.second.first
+            bottomRadius = newValue.first.second.second
+            rightTrim = newValue.second
         }
     }
 
     func path(in rect: CGRect) -> Path {
-        let w = max(0, bodyWidth), h = max(0, bodyHeight)
+        let trim = max(0, min(rightTrim, bodyWidth))
+        let w = max(0, bodyWidth - trim), h = max(0, bodyHeight)
         guard w > 0.5, h > 0.5 else { return Path() }
         let s = max(0, min(shoulderRadius, w / 4, h / 2))
         let r = max(0, min(bottomRadius, w / 2, h - s))
-        let l = rect.midX - w / 2 - s, rt = rect.midX + w / 2 + s
+        let l = rect.midX - bodyWidth / 2 - s, rt = l + w + 2 * s
         let t = rect.minY, b = rect.minY + h
         var p = Path()
         p.move(to: CGPoint(x: l, y: t))

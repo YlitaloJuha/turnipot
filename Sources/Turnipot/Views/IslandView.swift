@@ -9,6 +9,8 @@ struct IslandShapeState: Equatable {
     var shoulder: CGFloat = NotchGeometry.shoulderRadius
     /// Tucked into the physical notch (launch start / quit end).
     var hidden: Bool = false
+    /// Right edge pulled in (one-sided idle pill, Presentation.rightTrim).
+    var rightTrim: CGFloat = 0
 
     /// Tucked inside the physical notch: exactly notch-sized, no shoulders (invisible against it).
     static func hidden(_ g: NotchGeometry) -> IslandShapeState {
@@ -21,7 +23,8 @@ struct IslandShapeState: Equatable {
             size: CGSize(width: size.width + (other.size.width - size.width) * k,
                          height: size.height + (other.size.height - size.height) * k),
             radius: radius + (other.radius - radius) * k,
-            shoulder: max(0, shoulder + (other.shoulder - shoulder) * k))
+            shoulder: max(0, shoulder + (other.shoulder - shoulder) * k),
+            rightTrim: rightTrim + (other.rightTrim - rightTrim) * k)
     }
 }
 
@@ -129,7 +132,8 @@ struct IslandView: View {
     private var sizeAnimation: Animation {
         guard let d = displayedBox.value else { return Self.spring }
         let p = Presentation.current(appState: appState, ui: ui)
-        let target = IslandShapeState(size: p.bodySize(appState: appState, ui: ui), radius: p.bottomRadius)
+        let target = IslandShapeState(size: p.bodySize(appState: appState, ui: ui), radius: p.bottomRadius,
+                                      rightTrim: p.rightTrim(appState: appState))
         return IslandMotion.isShrink(from: d, to: target) ? .spring(IslandMotion.shrinkSpring) : Self.spring
     }
 
@@ -138,7 +142,8 @@ struct IslandView: View {
         let size = presentation.bodySize(appState: appState, ui: ui)
         let s = NotchGeometry.shoulderRadius
         let target = ui.islandShown
-            ? IslandShapeState(size: size, radius: presentation.bottomRadius)
+            ? IslandShapeState(size: size, radius: presentation.bottomRadius,
+                               rightTrim: presentation.rightTrim(appState: appState))
             : IslandShapeState.hidden(ui.geometry)
 
         let o = frameOverride
@@ -146,7 +151,8 @@ struct IslandView: View {
         let contentP = o?.content ?? presentation
         let contentSize = o == nil ? size : contentP.bodySize(appState: appState, ui: ui)
         let outline = NotchShape(bodyWidth: shape.size.width, bodyHeight: shape.size.height,
-                                 shoulderRadius: shape.shoulder, bottomRadius: shape.radius)
+                                 shoulderRadius: shape.shoulder, bottomRadius: shape.radius,
+                                 rightTrim: shape.rightTrim)
         let reduce = o == nil && ui.reduceMotion
         let split = o?.transitionOnly == true
         let opacity = split ? 1 : o?.contentOpacity ?? (ui.contentShown ? 1 : 0)

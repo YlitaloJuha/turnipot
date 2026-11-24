@@ -42,33 +42,8 @@ struct PermissionView: View {
                     .padding(.bottom, 12)
                     .help(request.summary)
 
+                // Open session on the left; Deny / Always allow / Allow on the right (primary last).
                 HStack(spacing: 8) {
-                    Button { decide(.allow) } label: {
-                        HStack(spacing: 6) {
-                            Text("Allow")
-                            Text("⌘↩").font(.system(size: 10)).foregroundStyle(Theme.muted)
-                        }
-                    }
-                    .buttonStyle(NotchButtonStyle(background: Color(hex: 0x1f6f3c)))
-
-                    if let rule = request.suggestedAlwaysRule {
-                        Button { decide(.allowAlways(rule: rule)) } label: {
-                            Text(Self.alwaysLabel(rule))
-                        }
-                        .buttonStyle(NotchButtonStyle())
-                        .help("Adds the allow rule \(rule)")
-                    }
-
-                    Button { decide(.deny) } label: {
-                        HStack(spacing: 6) {
-                            Text("Deny")
-                            Text("esc").font(.system(size: 10)).foregroundStyle(Theme.muted)
-                        }
-                    }
-                    .buttonStyle(NotchButtonStyle(background: Color(hex: 0x5b2323)))
-
-                    Spacer(minLength: 8)
-
                     Button {
                         guard ui.needsYouActionAllowed(request.id) else { return }
                         appState.openPermissionInTerminal(id: request.id)
@@ -78,6 +53,32 @@ struct PermissionView: View {
                         Text("Open session ↗")
                     }
                     .buttonStyle(NotchButtonStyle())
+
+                    Spacer(minLength: 8)
+
+                    Button { decide(.deny) } label: {
+                        HStack(spacing: 6) {
+                            Text("Deny")
+                            Text("esc").font(.system(size: 10)).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    .buttonStyle(NotchButtonStyle(background: Color(hex: 0x5b2323)))
+
+                    if let rule = request.suggestedAlwaysRule {
+                        Button { decide(.allowAlways(rule: rule)) } label: {
+                            Text(Self.alwaysLabel(rule))
+                        }
+                        .buttonStyle(NotchButtonStyle())
+                        .help("Adds the allow rule \(rule)")
+                    }
+
+                    Button { decide(.allow) } label: {
+                        HStack(spacing: 6) {
+                            Text("Allow")
+                            Text("⌘↩").font(.system(size: 10)).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    .buttonStyle(NotchButtonStyle(background: Color(hex: 0x1f6f3c)))
                 }
             }
             .padding(.horizontal, 18)

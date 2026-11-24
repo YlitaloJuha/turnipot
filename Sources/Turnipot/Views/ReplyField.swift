@@ -421,12 +421,23 @@ struct DesktopReplyButton: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("Claude Desktop session")
-                .font(.system(size: 12))
+            // Say why there's no field: quick reply types into terminals; Claude Desktop has no
+            // way to receive text from another app.
+            HStack(spacing: 5) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 11))
+                // Shorter wording where the slot is narrow (the panel's inline ↩ slot).
+                ViewThatFits(in: .horizontal) {
+                    Text("Quick reply works in terminal sessions only")
+                    Text("Quick reply: terminals only")
+                    Text("Terminals only")
+                }
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+            }
                 .foregroundStyle(Theme.muted)
-                .lineLimit(1)
-                .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .help("Turnipot can type replies into Terminal, iTerm2 and editor terminals, but Claude Desktop doesn't accept text from other apps. Reply there instead.")
             DesktopReplyChip(action: action)
         }
         .padding(.leading, 12)
