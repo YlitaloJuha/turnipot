@@ -257,7 +257,6 @@ struct ReaderView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .hapticHover()
             .help("Back to the session list (or scroll up past the top)")
             .frame(width: max(40, mascotX - 20 - 8), alignment: .leading)
 
@@ -281,7 +280,6 @@ struct ReaderView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .hapticHover()
                 .help(Fmt.showHelp(session))
                 SettingsMenuButton(appState: appState, ui: ui)
                 CloseButton {
@@ -371,7 +369,6 @@ struct ReaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .hapticHover()
         .disabled(!enabled)
         .help(title.contains("earlier") ? "Earlier reply (←)" : "Later reply (→)")
     }

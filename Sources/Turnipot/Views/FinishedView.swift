@@ -46,7 +46,6 @@ struct FinishedView: View {
                     .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
                 }
                 .buttonStyle(.plain)
-                .hapticHover()
                 .help("Dismiss")
             }
 
@@ -75,7 +74,6 @@ struct FinishedView: View {
                             .buttonStyle(.plain)
                             .help("Read the whole reply here (or scroll down over the message)")
                             .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
-                            .hapticHover()
                             Text("open ↗").font(.system(size: 11)).foregroundStyle(Theme.accent)
                                 .help(Fmt.showHelp(session))
                         }
@@ -92,7 +90,6 @@ struct FinishedView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .hapticHover()
 
                 if session.isClaudeDesktop {
                     DesktopReplyButton {

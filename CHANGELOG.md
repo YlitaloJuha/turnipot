@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- Trackpad haptics are quieter: the hover tick now only comes on action buttons (Allow, Deny, question options, prompt buttons), not on session rows, links or the small icons. The open tap, needs-you taps and turn-end burst are unchanged.
+
 ## 0.7.0
 
 **Usage resets**

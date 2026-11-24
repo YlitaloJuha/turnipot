@@ -50,7 +50,6 @@ struct AwaySummaryView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .hapticHover()
                     .help("Show all sessions")
                 }
             }
@@ -116,7 +115,6 @@ struct AwayItemRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .hapticHover("away-read:\(item.sessionId)")
             .help("Read reply (or scroll)")
             Text("open ↗")
                 .font(.system(size: 11))
@@ -133,7 +131,6 @@ struct AwayItemRow: View {
             // Scrolling down over a row opens that session's reader.
             ui.setReadTarget(.init(sessionId: item.sessionId, snippet: true), hovering: inside)
         }
-        .hapticHover("away-row:\(item.sessionId)")
         .onTapGesture(perform: onOpen)
         .help((s.map { ($0.isClaudeDesktop ? "Claude Desktop · " : "") + "\($0.name) · \(Fmt.abbreviatePath($0.cwd))\n" } ?? "")
               + (s?.isClaudeDesktop == true ? "Click: show in Claude Desktop" : "Click: open the terminal")
@@ -186,7 +183,6 @@ struct AwayResetRow: View {
             .fill(hovering.value ? Theme.rowHover : .clear))
         .contentShape(Rectangle())
         .onHover { hovering.value = $0 }
-        .hapticHover("away-row:\(item.sessionId)")
         .onTapGesture(perform: onOpen)
         .help("Click: show usage in the panel")
     }

@@ -96,7 +96,7 @@ A little turnip lives in an orange pot in your notch. It naps while nothing runs
 
 ### Trackpad haptics
 
-Feel it as well as see it: a light tick as the pointer moves over sessions and buttons in the notch, a soft tap when the panel opens, two firm taps when Claude needs you, and a little launch-top-landing burst in time with the turnip's jump when a turn ends. Needs a Force Touch trackpad, and you only feel it while a finger rests on the trackpad. Turn it off with ⚙ (or right-click the notch) → **Trackpad haptics**.
+Feel it as well as see it: a light tick as the pointer moves onto an action button (Allow, Deny, question options), a soft tap when the panel opens, two firm taps when Claude needs you, and a little launch-top-landing burst in time with the turnip's jump when a turn ends. Needs a Force Touch trackpad, and you only feel it while a finger rests on the trackpad. Turn it off with ⚙ (or right-click the notch) → **Trackpad haptics**.
 
 ## Install
 
