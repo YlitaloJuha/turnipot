@@ -3,7 +3,8 @@ import NotchCore
 
 /// Collapsed pill (mockup states 1, 2, 5): left wing = mascot (+ green dot and busy count while
 /// working), center = physical notch (empty), right wing = session usage % + ring while working,
-/// red "91% wk" + red ring when near the limit, else the muted session count.
+/// red "91% wk" + red ring when near the limit, else the muted session count (none with no
+/// sessions: the pill is one-sided then, PillLayout.oneSided).
 /// While finished sessions are unseen, an orange "2 done" / amber "1 waiting" badge follows the
 /// mascot (and the busy count); the wings grow to fit it (PillLayout).
 struct CollapsedView: View {
@@ -91,7 +92,7 @@ struct CollapsedView: View {
                     .transition(.opacity)
                 UsageRing(percent: w.percent, color: Fmt.usageColor(w.percent))
                     .transition(.opacity)
-            } else {
+            } else if !PillLayout.oneSided(appState: appState) {
                 Text("\(appState.sessions.count)")
                     .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(Theme.muted)

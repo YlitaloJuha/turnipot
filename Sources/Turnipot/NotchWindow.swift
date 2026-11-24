@@ -371,7 +371,7 @@ final class NotchWindowController {
     ///   can't scroll (everything fits) or the gesture STARTED with the list already at its
     ///   bottom; over a row's reply snippet / ≡ button it always opens. Otherwise the list
     ///   scrolls normally (a gesture that scrolled the list never turns into "open reader").
-    /// - Finished drop-down (message / "Read ›") and away summary rows: scrolling down opens it.
+    /// - Finished drop-down (message / "Read ⌄") and away summary rows: scrolling down opens it.
     /// - Reader: see handleReaderScroll (OverscrollBackGesture).
     /// Momentum (inertial) events never trigger anything; gestures that start over a reply
     /// field (it scrolls itself once it holds more than 5 lines) neither. Returns true to
@@ -564,7 +564,7 @@ final class NotchWindowController {
         // Tucked away / retracting: nothing to hover or click.
         guard ui.islandShown, !isRetracting else { return .null }
         let size = currentPresentation.bodySize(appState: appState, ui: ui)
-        var r = geometry.islandScreenRect(bodySize: size)
+        var r = geometry.islandScreenRect(bodySize: size, rightTrim: currentPresentation.rightTrim(appState: appState))
         r.size.height += 4
         return r.insetBy(dx: -2, dy: -2)
     }

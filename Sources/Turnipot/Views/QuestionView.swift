@@ -270,7 +270,7 @@ struct NeedsYouTitle: View {
 
 /// AskUserQuestion: session title, "1/2" step, the question's header + text, options as rows
 /// (key number, radio / checkbox, bold label + muted description), "Other…" free text, and
-/// ‹ Back / Next › / Submit ⌘↩ · Answer in terminal ↗. 1-9 pick options while hovered.
+/// Answer in terminal ↗ · ‹ Back / Next › / Submit ⌘↩. 1-9 pick options while hovered.
 struct QuestionView: View {
     @ObservedObject var appState: AppState
     let request: PermissionRequest
@@ -377,7 +377,17 @@ struct QuestionView: View {
         let answered = d.selections.indices.contains(step) && d.selections[step].isAnswered
         let last = step >= qs.count - 1
         let allAnswered = QuestionAnswers.answers(qs, d.selections) != nil
+        // Answer elsewhere on the left; Back / Next / Submit on the right.
         HStack(spacing: 8) {
+            Button { QuestionActions.answerInTerminal(appState: appState, ui: ui, request: request) } label: {
+                HStack(spacing: 6) {
+                    Text(appState.session(id: request.sessionId)?.isClaudeDesktop == true ? "Answer in Claude ↗" : "Answer in terminal ↗")
+                    Text("esc").font(.system(size: 10)).foregroundStyle(Theme.muted)
+                }
+            }
+            .buttonStyle(NotchButtonStyle())
+            .help("Let Claude Code show the question itself and open the session")
+            Spacer(minLength: 8)
             if qs.count > 1 && step > 0 {
                 Button {
                     withAnimation(.spring(IslandMotion.growSpring)) { ui.updateDraft(for: request) { $0.step = step - 1 } }
@@ -405,15 +415,6 @@ struct QuestionView: View {
                 .opacity(answered ? 1 : 0.45)
                 .disabled(!answered)
             }
-            Spacer(minLength: 8)
-            Button { QuestionActions.answerInTerminal(appState: appState, ui: ui, request: request) } label: {
-                HStack(spacing: 6) {
-                    Text(appState.session(id: request.sessionId)?.isClaudeDesktop == true ? "Answer in Claude ↗" : "Answer in terminal ↗")
-                    Text("esc").font(.system(size: 10)).foregroundStyle(Theme.muted)
-                }
-            }
-            .buttonStyle(NotchButtonStyle())
-            .help("Let Claude Code show the question itself and open the session")
         }
     }
 }
@@ -538,6 +539,23 @@ struct PlanView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
+            // Open session on the left; Keep planning / Approve on the right (primary last).
+            Button { QuestionActions.answerInTerminal(appState: appState, ui: ui, request: request) } label: {
+                Text("Open session ↗")
+            }
+            .buttonStyle(NotchButtonStyle())
+            .help("Let Claude Code show the plan approval itself and open the session (esc)")
+            Spacer(minLength: 8)
+            Button {
+                if feedbackOpen {
+                    ui.planFeedbackRequestId = nil
+                    if ui.isEditing { ui.releaseKey() }
+                } else {
+                    ui.planFeedbackRequestId = request.id
+                }
+            } label: { Text(feedbackOpen ? "Cancel" : "Keep planning…") }
+            .buttonStyle(NotchButtonStyle())
+            .help("Tell Claude what to change; it stays in plan mode")
             HStack(spacing: 1) {
                 Button { QuestionActions.approvePlan(.manual, appState: appState, ui: ui, request: request) } label: {
                     HStack(spacing: 6) {
@@ -551,22 +569,6 @@ struct PlanView: View {
                     QuestionActions.approvePlan(mode, appState: appState, ui: ui, request: request)
                 }
             }
-            Button {
-                if feedbackOpen {
-                    ui.planFeedbackRequestId = nil
-                    if ui.isEditing { ui.releaseKey() }
-                } else {
-                    ui.planFeedbackRequestId = request.id
-                }
-            } label: { Text(feedbackOpen ? "Cancel" : "Keep planning…") }
-            .buttonStyle(NotchButtonStyle())
-            .help("Tell Claude what to change; it stays in plan mode")
-            Spacer(minLength: 8)
-            Button { QuestionActions.answerInTerminal(appState: appState, ui: ui, request: request) } label: {
-                Text("Open session ↗")
-            }
-            .buttonStyle(NotchButtonStyle())
-            .help("Let Claude Code show the plan approval itself and open the session (esc)")
         }
     }
 }

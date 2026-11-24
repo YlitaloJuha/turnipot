@@ -2,7 +2,7 @@ import Foundation
 import NotchCore
 
 /// `Turnipot --demo=<state>`: run the UI with fake data and no monitors / sockets, for visual
-/// checks. States: idle, working, finished, permission, nearlimit, expanded, plus the "missed
+/// checks. States: idle, empty (no sessions: one-sided pill), working, finished, permission, nearlimit, expanded, plus the "missed
 /// sessions" states: unseen (pill "2 done"), unseen-working ("● 1" + "2 done"), unseen-mixed
 /// ("1 waiting · 1 done"), expanded-unseen (2 unseen rows, one waiting, + an idle row with 3
 /// running agents), away (the "While you were away" summary), reader / reader-working (the
@@ -280,6 +280,9 @@ enum DemoMode {
         case "idle":
             app.updateSessions(busyAll.map { var s = $0; s.status = .idle; return s })
             app.updateUsage(usage)
+        case "empty":
+            // No sessions: the one-sided pill (no "0" on the right).
+            app.updateUsage(usage)
         case "finished":
             app.updateSessions(busyAll)
             app.updateUsage(usage)
@@ -423,7 +426,7 @@ enum RenderCommand {
         let geo = NotchGeometry(screenFrame: screen,
                                 notchRect: CGRect(x: screen.midX - 92.5, y: screen.maxY - 32, width: 185, height: 32),
                                 hasNotch: true)
-        var states = ["idle", "working", "finished", "permission", "nearlimit", "expanded",
+        var states = ["idle", "empty", "working", "finished", "permission", "nearlimit", "expanded",
                       "expanded-reveal", "expanded-unseen-reveal", "expanded-reply", "reader-reply", "finished-reply",
                       "unseen", "unseen-working", "unseen-mixed", "expanded-unseen", "away",
                       "reader", "reader-working", "expanded-desktop", "expanded-side", "finished-desktop", "reader-desktop",
@@ -553,7 +556,8 @@ enum RenderCommand {
         }
 
         @MainActor func shapeOf(_ p: Presentation, _ app: AppState, _ ui: NotchUIState) -> IslandShapeState {
-            IslandShapeState(size: p.bodySize(appState: app, ui: ui), radius: p.bottomRadius)
+            IslandShapeState(size: p.bodySize(appState: app, ui: ui), radius: p.bottomRadius,
+                             rightTrim: p.rightTrim(appState: app))
         }
         /// The pill as it looks for this demo state (wing width depends on counts / unseen badge).
         @MainActor func collapsedOf(_ app: AppState, _ ui: NotchUIState) -> Presentation {

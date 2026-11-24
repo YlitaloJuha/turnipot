@@ -310,6 +310,15 @@ enum Presentation: Equatable {
         }
     }
 
+    /// Right edge pulled in by this much (one-sided idle pill, see PillLayout.oneSided).
+    @MainActor
+    func rightTrim(appState: AppState) -> CGFloat {
+        if case .collapsed(let wing) = self, PillLayout.oneSided(appState: appState) {
+            return wing + PillLayout.oneSidedTuck
+        }
+        return 0
+    }
+
     /// Body size (shoulders excluded).
     @MainActor
     func bodySize(appState: AppState, ui: NotchUIState) -> CGSize {
@@ -643,6 +652,18 @@ enum PillLayout {
             leftWidth(appState: appState, ui: ui, badge: $0) <= NotchGeometry.maxCollapsedWingWidth
         }
     }
+
+    /// Idle with no sessions: the right wing would only show a muted "0", so the pill drops it
+    /// and is one-sided (mascot wing only; the right edge tucks under the physical notch).
+    static func oneSided(appState: AppState) -> Bool {
+        appState.usage.nearLimitWindow == nil && !appState.isAnyBusy && !appState.hasUnseen
+            && appState.sessions.isEmpty
+    }
+
+    /// How far the right edge of a one-sided pill moves in: the whole right wing plus enough to
+    /// hide the right shoulder and bottom-right corner under the notch (clear of its own rounded
+    /// bottom corner).
+    static let oneSidedTuck: CGFloat = 20
 
     static func wing(appState: AppState, ui: NotchUIState) -> CGFloat {
         let wide = appState.isAnyBusy || appState.isNearLimit || appState.hasUnseen

@@ -3,7 +3,7 @@ import NotchCore
 
 /// "Session finished" drop-down (mockup state 3 + interactions C): hopping mascot and "✓ done"
 /// in the notch strip; session name, "finished · tokens · age"; the last assistant message
-/// (up to 2 lines); quick reply field. Tapping the text focuses the terminal; "Read ›" or scrolling
+/// (up to 2 lines); quick reply field. Tapping the text focuses the terminal; "Read ⌄" or scrolling
 /// down over the message opens the reply reader; × dismisses.
 struct FinishedView: View {
     @ObservedObject var appState: AppState
@@ -16,6 +16,10 @@ struct FinishedView: View {
     static let stageLeading: CGFloat = 14
     static let stageBottom: CGFloat = 10
     static func replySlot(_ sessionId: String) -> String { "finished-\(sessionId)" }
+    /// The "Read ⌄" row at the bottom center (included in NotchGeometry.finishedSize).
+    static let readRowTopGap: CGFloat = 6
+    static let readRowHeight: CGFloat = 24
+    static let readRowBottomPad: CGFloat = 8
     /// Width of the reply field (the text column).
     static var replyFieldWidth: CGFloat {
         NotchGeometry.finishedSize.width - stageTextLeading - 18
@@ -51,8 +55,7 @@ struct FinishedView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Button {
-                    appState.focusSession(id: session.sessionId)
-                    dismiss()
+                    focusAndClose()
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
@@ -62,20 +65,6 @@ struct FinishedView: View {
                                 .foregroundStyle(Theme.muted)
                                 .lineLimit(1)
                             Spacer(minLength: 0)
-                            Button {
-                                openReader()
-                            } label: {
-                                Text("Read ›")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Theme.accent)
-                                    .padding(.horizontal, 4)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .help("Read the whole reply here (or scroll down over the message)")
-                            .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
-                            Text("open ↗").font(.system(size: 11)).foregroundStyle(Theme.accent)
-                                .help(Fmt.showHelp(session))
                         }
                         if let text = lastText {
                             Text("“\(text)”")
@@ -90,12 +79,10 @@ struct FinishedView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(Fmt.showHelp(session))   // the whole card opens the session
 
                 if session.isClaudeDesktop {
-                    DesktopReplyButton {
-                        appState.focusSession(id: session.sessionId)
-                        dismiss()
-                    }
+                    DesktopReplyButton { focusAndClose() }
                     .padding(.top, 4)
                 } else {
                     ReplyField(slot: Self.replySlot(session.sessionId), placeholder: "Reply…", target: session.name,
@@ -111,8 +98,31 @@ struct FinishedView: View {
             .padding(.leading, Self.stageTextLeading)
             .padding(.trailing, 18)
             .padding(.top, 2)
-            .padding(.bottom, 14)
+            .padding(.bottom, Self.readRowTopGap)
             Spacer(minLength: 0)
+
+            // Bottom center, like a pull-down handle: the reader opens downward from here.
+            Button {
+                openReader()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Read")
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Read the whole reply here (or scroll down over the message)")
+            .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.readRowHeight)
+            .padding(.bottom, Self.readRowBottomPad)
         }
         .overlay(alignment: .bottomLeading) {
             TurnipMascotView(mood: .hop, pixelSize: Self.stagePixel, layout: .stage)
@@ -130,6 +140,16 @@ struct FinishedView: View {
     private func openReader() {
         ui.stickyFinishedId = nil
         appState.openReader(sessionId: session.sessionId)
+    }
+
+    /// Open the session and close the island: without this the pointer (still over the notch)
+    /// hover-expands the session list behind the dismissed drop-down. Like the panel's ✕, no
+    /// hover-expand again until the pointer has left the island.
+    private func focusAndClose() {
+        appState.focusSession(id: session.sessionId)
+        ui.suppressHoverUntilExit = true
+        dismiss()
+        appState.setHovering(false)
     }
 
     private func dismiss() {
