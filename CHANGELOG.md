@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+- Near the limit, the collapsed pill's "91% 5h" no longer has its first digit cut off by the notch: the right wing keeps a little gap from the notch.
+
 ## 0.7.1
 
 - Trackpad haptics are quieter: the hover tick now only comes on action buttons (Allow, Deny, question options, prompt buttons), not on session rows, links or the small icons. The open tap, needs-you taps and turn-end burst are unchanged.

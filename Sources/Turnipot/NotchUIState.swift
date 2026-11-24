@@ -631,6 +631,9 @@ enum PillLayout {
     static let usageGap: CGFloat = 6
     static let ringSize: CGFloat = 18
     static let rightTrailingPad: CGFloat = 10
+    /// Clearance between the physical notch and the right wing's text: the notch's rounded bottom
+    /// corner (and any rounding in the measured notch width) otherwise clips its first digit.
+    static let rightLeadingPad: CGFloat = 8
     static let usageFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
 
     static func rightWidth(appState: AppState) -> CGFloat {
@@ -643,7 +646,7 @@ enum PillLayout {
         } else {
             return 0   // session count only: always fits
         }
-        return textWidth(text, font: font) + usageGap + ringSize + rightTrailingPad
+        return rightLeadingPad + textWidth(text, font: font) + usageGap + ringSize + rightTrailingPad
     }
 
     static func badge(appState: AppState, ui: NotchUIState) -> PillBadge? {
