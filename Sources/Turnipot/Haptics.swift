@@ -37,7 +37,7 @@ final class Haptics: ObservableObject {
         if on { perform(.alignment, why: "enabled") } else { cancelPending() }
     }
 
-    /// The pointer moved onto a hover target (row, button).
+    /// The pointer moved onto a hover target (an action button).
     func hover(_ target: String) {
         if let p = scheduler.hover(target: target, at: now) { perform(p, why: "hover \(target)") }
     }
@@ -108,8 +108,9 @@ extension Presentation {
     }
 }
 
-/// Light hover tick when the pointer moves onto this view (rows, buttons). `id` defaults to a
-/// per-view identity, so each button / row is its own target.
+/// Light hover tick when the pointer moves onto this view. Only on action buttons (Allow / Deny,
+/// question options, prompt buttons), not on rows, links or chrome. `id` defaults to a
+/// per-view identity, so each button is its own target.
 private struct HapticHover: ViewModifier {
     let id: String?
     @StateObject private var token = LocalState(UUID().uuidString)

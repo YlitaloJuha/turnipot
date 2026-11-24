@@ -386,7 +386,6 @@ struct SettingsMenuButton: View {
         .frame(width: 18, height: 20)
         .contentShape(Rectangle())
         .onHover { hovering.value = $0 }
-        .hapticHover()
         .help("Settings")
     }
 }
@@ -409,7 +408,6 @@ struct BarIconButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering.value = $0 }
-        .hapticHover()
         .help(help)
     }
 }

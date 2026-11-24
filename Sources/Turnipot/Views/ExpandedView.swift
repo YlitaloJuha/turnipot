@@ -41,7 +41,6 @@ struct ExpandedView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .hapticHover()
                         .help("Clear the highlight on every finished session")
                         .transition(.opacity)
                     }
@@ -324,7 +323,6 @@ struct SessionRow: View {
                 .buttonStyle(.plain)
                 .help("Read reply (or scroll)")
                 .onHover { ui.setReadTarget(.init(sessionId: id, snippet: true), hovering: $0) }
-                .hapticHover("read:\(id)")
                 let dialogOpen = appState.terminalDialogMayBeOpen(id)
                 Button {
                     // Claude may be showing a dialog in the terminal: the reply's Enter would answer it.
@@ -342,7 +340,6 @@ struct SessionRow: View {
                 // Claude Desktop sessions: the slot below holds "Reply in Claude ↗", not a field.
                 .help(dialogOpen ? ReplyField.terminalDialogHelp
                       : session.isClaudeDesktop ? "Reply in Claude Desktop" : "Quick reply")
-                .hapticHover("reply:\(id)")
             }
             .frame(width: ExpandedMetrics.buttonsWidth)
             .opacity(hovering.value || ui.replyTargetId == id ? 1 : 0.3)
@@ -379,7 +376,6 @@ struct SessionRow: View {
                 app.markSeen(sessionId: sid)
             }
         }
-        .hapticHover("row:\(id)")
         .onDisappear {
             seenTask.value?.cancel()
             ui.rowHover(id, inside: false)
@@ -564,7 +560,6 @@ struct CloseButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering.value = $0 }
-        .hapticHover()
         .help("Close")
     }
 }
