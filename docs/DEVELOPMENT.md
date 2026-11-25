@@ -16,6 +16,7 @@ The bundle contains:
 
 - `Contents/MacOS/Turnipot`: the app.
 - `Contents/Helpers/turnipot-hook`: the Claude Code permission hook (Foundation only, starts in milliseconds).
+- `Contents/Resources/AppIcon.icns`: the app icon, copied from `Resources/AppIcon.icns`.
 - `Contents/Resources/turnipot-bridge.vsix`: the editor extension (`install-extension.sh --package`), installed by ⚙ → Install editor extension….
 
 Bundle id: `com.juhaylitalo.turnipot` (the hook is signed as `com.juhaylitalo.turnipot.hook`). Before 0.4.0 it was `com.local.turnipot`: on the first launch under the new id Turnipot copies the old settings over once (`LegacyMigration.migrateBundleDomain`; the old domain is left alone). macOS keeps login items per bundle id, so **Launch at login** has to be turned on again after that update. The version comes from the `VERSION` file (CFBundleShortVersionString and CFBundleVersion).
@@ -214,7 +215,7 @@ Offscreen renders (`--render`) can't draw AppKit-backed views, so the reader's s
 
 ## Brand assets
 
-`docs/brand/` holds the README banner (`banner.svg` light, `banner-dark.svg` dark) and the mark (`mark.svg`, `mark-512.png`: the turnip in its pot on a black tile). `social-preview.png` (1280 × 640, from `social-preview.svg`, the dark banner at 2:1) is uploaded by hand under the repository's Settings → General → Social preview; GitHub has no API for it. `python3 scripts/brand-assets.py docs/brand` writes the SVGs; the pixel art copies `TurnipRig`'s grids and colours, so update both together. The banner shows the top of a MacBook (bezel, menu bar, notch) with the panel and a permission drop-down; they are drawn, not rendered, with demo data only and no Apple logo.
+`docs/brand/` holds the README banner (`banner.svg` light, `banner-dark.svg` dark) and the mark (`mark.svg`, `mark-512.png`: the turnip in its pot on a black tile). `social-preview.png` (1280 × 640, from `social-preview.svg`, the dark banner at 2:1) is uploaded by hand under the repository's Settings → General → Social preview; GitHub has no API for it. `python3 scripts/brand-assets.py docs/brand` writes the SVGs; the pixel art copies `TurnipRig`'s grids and colours, so update both together. `python3 scripts/app-icon.py` (needs Pillow) draws the same turnip on a dark macOS-style tile and writes the committed `Resources/AppIcon.icns` (with `docs/brand/app-icon-1024.png` as a preview) and the editor extension's `vscode-extension/icon.png`; rerun it when the art changes. The banner shows the top of a MacBook (bezel, menu bar, notch) with the panel and a permission drop-down; they are drawn, not rendered, with demo data only and no Apple logo.
 
 ## Exporting the README media
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Turnipot has an app icon (the turnip in its pot) in Finder, Launchpad, the DMG and Login Items, instead of the generic one. The editor extension (Turnipot Bridge 0.2.1) shows it too in the editor's Extensions list.
+
 ## 0.7.2
 
 - Near the limit, the collapsed pill's "91% 5h" no longer has its first digit cut off by the notch: the right wing keeps a little gap from the notch.

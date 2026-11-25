@@ -3,6 +3,7 @@
 # Developer ID and the hardened runtime when SIGN_IDENTITY is set, as release.sh does).
 #   Contents/MacOS/Turnipot   the app
 #   Contents/Helpers/turnipot-hook  the Claude Code PermissionRequest hook (see install-hook.sh)
+#   Contents/Resources/AppIcon.icns          the app icon (scripts/app-icon.py)
 #   Contents/Resources/turnipot-bridge.vsix  the editor extension (⚙ → Install editor extension…)
 # The version comes from the VERSION file (CFBundleShortVersionString and CFBundleVersion).
 #
@@ -40,6 +41,7 @@ cp "$BIN/turnipot-hook" "$APP/Contents/Helpers/turnipot-hook"
 chmod 755 "$APP/Contents/MacOS/Turnipot" "$APP/Contents/Helpers/turnipot-hook"
 VSIX="$("$ROOT/scripts/install-extension.sh" --package)"
 cp "$VSIX" "$APP/Contents/Resources/turnipot-bridge.vsix"
+cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -48,6 +50,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleExecutable</key><string>Turnipot</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>Turnipot</string>
