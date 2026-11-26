@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.3
 
 - Turnipot has an app icon (the turnip in its pot) in Finder, Launchpad, the DMG and Login Items, instead of the generic one. The editor extension (Turnipot Bridge 0.2.1) shows it too in the editor's Extensions list.
 
