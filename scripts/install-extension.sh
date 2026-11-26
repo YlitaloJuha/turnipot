@@ -60,12 +60,13 @@ build_vsix() {
   STAGE="$(mktemp -d)"
   trap 'rm -rf "$STAGE"' EXIT
   mkdir -p "$STAGE/extension" "$BUILD"
-  cp "$SRC/package.json" "$SRC/extension.js" "$STAGE/extension/"
+  cp "$SRC/package.json" "$SRC/extension.js" "$SRC/icon.png" "$STAGE/extension/"
   cat > "$STAGE/[Content_Types].xml" <<'XML'
 <?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension=".json" ContentType="application/json"/>
   <Default Extension=".js" ContentType="application/javascript"/>
+  <Default Extension=".png" ContentType="image/png"/>
   <Default Extension=".vsixmanifest" ContentType="text/xml"/>
 </Types>
 XML
@@ -76,6 +77,7 @@ XML
       <Identity Language="en-US" Id="$NAME" Version="$VERSION" Publisher="local"/>
       <DisplayName>Turnipot Bridge</DisplayName>
       <Description xml:space="preserve">Lets the Turnipot app focus and type into integrated terminals running Claude Code.</Description>
+      <Icon>extension/icon.png</Icon>
       <Properties>
         <Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.80.0"/>
         <Property Id="Microsoft.VisualStudio.Code.ExtensionKind" Value="ui,workspace"/>
@@ -87,6 +89,7 @@ XML
   <Dependencies/>
   <Assets>
       <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/>
+      <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/icon.png" Addressable="true"/>
   </Assets>
 </PackageManifest>
 XML
