@@ -367,10 +367,8 @@ final class NotchWindowController {
     static let backScrollThreshold: Double = 60
 
     /// Rules:
-    /// - Expanded panel: scrolling DOWN over a session row opens its reader when the session list
-    ///   can't scroll (everything fits) or the gesture STARTED with the list already at its
-    ///   bottom; over a row's reply snippet / ≡ button it always opens. Otherwise the list
-    ///   scrolls normally (a gesture that scrolled the list never turns into "open reader").
+    /// - Expanded panel: scrolling never opens anything; it only scrolls the session list
+    ///   (click ≡ on a row to read its reply).
     /// - Finished drop-down (message / "Read ⌄") and away summary rows: scrolling down opens it.
     /// - Reader: see handleReaderScroll (OverscrollBackGesture).
     /// Momentum (inertial) events never trigger anything; gestures that start over a reply
@@ -394,19 +392,15 @@ final class NotchWindowController {
             scrollGestureDone = false
             scrollGestureAllowed = !scrollGestureOverReplyField && scrollGestureCanTrigger(p)
             gestureReadTarget = ui.readTarget
-            // The list scrolled under a still pointer: the row under it now is wherever the
-            // scroll left it, not one the user pointed at. Move the pointer first.
-            if case .expanded = p, listScrolledUnderPointer { scrollGestureAllowed = false }
         }
         guard e.momentumPhase.isEmpty, !scrollGestureDone, scrollGestureAllowed else { return false }
-        // A row (or its read button) that slid under the pointer mid-gesture never opens.
+        // A target that slid under the pointer mid-gesture never opens.
         guard ui.readTarget == gestureReadTarget else { return false }
         let dy = e.hasPreciseScrollingDeltas ? e.scrollingDeltaY : e.scrollingDeltaY * 8
         scrollAccum += dy
         switch p {
-        case .expanded, .finished, .awaySummary:
+        case .finished, .awaySummary:
             guard let target = ui.readTarget, appState.session(id: target.sessionId) != nil else { return false }
-            if case .expanded = p, !target.snippet, !scrollGestureAllowedForList { return false }
             guard scrollAccum <= -Self.readScrollThreshold else { return false }
             scrollGestureDone = true
             ui.stickyFinishedId = nil
@@ -469,18 +463,14 @@ final class NotchWindowController {
         withAnimation(.easeOut(duration: q == 0 ? 0.2 : 0.08)) { ui.readerBackProgress = q }
     }
 
-    /// Snapshot at gesture start: may this gesture open / leave the reader?
-    private var scrollGestureAllowedForList = false
     /// Read target under the pointer when the gesture began.
     private var gestureReadTarget: NotchUIState.ReadTarget?
-    /// The session list moved since the pointer last moved (see noteListPosition / pointerMoved).
-    private var listScrolledUnderPointer = false
-    private var pointerTravelSinceListScroll: CGFloat = 0
     private weak var listScrollView: NSScrollView?
     private var lastListOriginY: CGFloat?
 
     /// Called on every scroll event while the list shows (before the event is applied): if the
-    /// list's offset changed since the previous event, it scrolled under the pointer.
+    /// list's offset changed since the previous event, it scrolled under the pointer (parks
+    /// hover-to-reveal until the pointer moves).
     private func noteListPosition(refresh: Bool) {
         if refresh || listScrollView?.window == nil {
             let found = mainScrollView()
@@ -490,43 +480,21 @@ final class NotchWindowController {
         guard let s = listScrollView else { return }
         let y = s.contentView.bounds.origin.y
         if let last = lastListOriginY, abs(y - last) > 0.5 {
-            listScrolledUnderPointer = true
-            pointerTravelSinceListScroll = 0
             ui.rowListScrolled()
         }
         lastListOriginY = y
     }
 
-    /// Real pointer movement (a few points, not hand jitter on the wheel) re-arms scroll-to-read.
-    private func pointerMoved(_ e: NSEvent) {
-        ui.pointerMoved()
-        guard listScrolledUnderPointer else { return }
-        pointerTravelSinceListScroll += abs(e.deltaX) + abs(e.deltaY)
-        if pointerTravelSinceListScroll >= 4 { listScrolledUnderPointer = false }
-    }
+    /// Pointer movement resumes hover-to-reveal after a scroll.
+    private func pointerMoved(_ e: NSEvent) { ui.pointerMoved() }
 
     private func scrollGestureCanTrigger(_ p: Presentation) -> Bool {
         switch p {
-        case .expanded:
-            scrollGestureAllowedForList = listCannotScroll || listAtBottom
-            return true      // snippet targets are always allowed; rows check the flag above
         case .finished, .awaySummary:
             return true
         default:
-            return false
+            return false     // the session list only ever scrolls (≡ / click opens the reader)
         }
-    }
-
-    private var listCannotScroll: Bool {
-        ExpandedMetrics.sessionsContentHeight(appState: appState, ui: ui)
-            <= ExpandedMetrics.sessionsViewportMax(strip: geometry.notchHeight) + 0.5
-    }
-
-    /// Read from the session list's NSScrollView (a GeometryReader preference inside a macOS
-    /// ScrollView isn't updated by scrolling, so it can't tell).
-    private var listAtBottom: Bool {
-        guard let s = mainScrollView() else { return false }
-        return Self.distanceFromBottom(s) <= 2
     }
 
     // MARK: Scroll views in the panel
@@ -617,12 +585,16 @@ final class NotchWindowController {
         if panel.ignoresMouseEvents != ignore { panel.ignoresMouseEvents = ignore }
         // A drop-down that appeared under the pointer arms its hot keys once the pointer moves.
         if inside && mouseInside && !hotKeyGate.isArmed { updateHotKeys() }
+        // Close (✕) guard: cleared once the pointer is outside AND has moved off the spot it
+        // closed from. While the island retracts its rect is empty, so "outside" alone would
+        // clear it and the still pointer would hover the panel open again.
+        if !inside, ui.suppressHoverUntilExit,
+           let at = ui.suppressHoverPointer, hypot(p.x - at.x, p.y - at.y) > 3 {
+            ui.suppressHoverUntilExit = false
+        }
         guard inside != mouseInside else { return }
         mouseInside = inside
-        if !inside {
-            ui.suppressHoverUntilExit = false
-            Haptics.shared.resetHover()
-        }
+        if !inside { Haptics.shared.resetHover() }
         updateHotKeys()
         insidePoll?.invalidate()
         insidePoll = nil

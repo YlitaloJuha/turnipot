@@ -10,6 +10,35 @@ public struct UsageReset: Equatable, Sendable {
     }
 }
 
+/// When the near-limit banner shows: once per window per level (85%, 95%, 100%). "Got it" (or
+/// the banner timing out) acknowledges the window's current level; it shows again only when
+/// the window climbs to the next level, or after it drops back under 85% (it reset).
+public enum NearLimitRule {
+    public static let levels = [NotchConstants.nearLimitPercent, 95, 100]
+    /// How long the banner stays (unless hovered / dismissed).
+    public static let lifetime: TimeInterval = 10
+    /// After the pointer leaves it.
+    public static let afterHoverLifetime: TimeInterval = 3
+
+    /// Index into `levels` for `percent`; nil below the first.
+    public static func level(_ percent: Int) -> Int? { levels.lastIndex { percent >= $0 } }
+
+    /// Should the banner show for `window`, given the acknowledged levels by window label?
+    public static func due(_ window: UsageWindow, acked: [String: Int]) -> Bool {
+        guard let l = level(window.percent) else { return false }
+        return (acked[window.label] ?? -1) < l
+    }
+
+    /// Acknowledgements still valid for `windows`: a window under the first level reset, so its
+    /// entry goes (windows missing from the snapshot keep theirs).
+    public static func pruned(_ acked: [String: Int], windows: [UsageWindow]) -> [String: Int] {
+        acked.filter { label, _ in
+            guard let w = windows.first(where: { $0.label == label }) else { return true }
+            return level(w.percent) != nil
+        }
+    }
+}
+
 public enum UsageResetRule {
     /// Only announce resets of windows that had been used this much (a 5h window that reset at 3%
     /// is not news).

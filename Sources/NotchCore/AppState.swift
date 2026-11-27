@@ -27,8 +27,18 @@ public final class AppState: ObservableObject {
     @Published public private(set) var isHovering: Bool = false
     /// True when the user explicitly expanded the panel by clicking.
     @Published public private(set) var isPinnedExpanded: Bool = false
-    /// The near-limit banner was dismissed for the current window/percent bucket.
-    @Published public private(set) var nearLimitDismissed: Bool = false
+    /// Near-limit levels acknowledged per window label (NearLimitRule). The app layer loads it at
+    /// launch and saves it through `onNearLimitAckedChange`, so a restart doesn't show it again.
+    @Published public var nearLimitAcked: [String: Int] = [:] {
+        didSet { if nearLimitAcked != oldValue { onNearLimitAckedChange?(nearLimitAcked) } }
+    }
+    public var onNearLimitAckedChange: (([String: Int]) -> Void)?
+    private var nearLimitExpiry: Task<Void, Never>?
+    /// The banner is due: the highest near-limit window reached a level not acknowledged yet.
+    public var nearLimitDue: Bool {
+        guard let w = usage.nearLimitWindow else { return false }
+        return NearLimitRule.due(w, acked: nearLimitAcked)
+    }
     /// Latest usage window reset to announce (cleared after UsageResetRule.lifetime / dismiss).
     @Published public private(set) var usageReset: UsageReset?
     private var usageResetExpiry: Task<Void, Never>?
@@ -304,13 +314,13 @@ public final class AppState: ObservableObject {
             usageResetExpiry?.cancel()
             usageResetExpiry = nil
         }
-        if let w = snapshot.nearLimitWindow {
-            if wasNear == nil || (wasNear!.percent / 5) != (w.percent / 5) {
-                nearLimitDismissed = false
-                addEvent(.usageNearLimit(label: w.label, percent: w.percent), lifetime: 8)
-            }
-        } else {
-            nearLimitDismissed = false
+        if !snapshot.stale {
+            let pruned = NearLimitRule.pruned(nearLimitAcked, windows: snapshot.windows)
+            if pruned != nearLimitAcked { nearLimitAcked = pruned }
+        }
+        if let w = snapshot.nearLimitWindow, NearLimitRule.due(w, acked: nearLimitAcked),
+           wasNear.map({ NearLimitRule.level($0.percent) != NearLimitRule.level(w.percent) || $0.label != w.label }) ?? true {
+            addEvent(.usageNearLimit(label: w.label, percent: w.percent), lifetime: 8)
         }
         recomputeMode()
     }
@@ -553,9 +563,23 @@ public final class AppState: ObservableObject {
         recomputeMode()
     }
 
+    /// "Got it" / timed out: acknowledge the shown window's current level.
     public func dismissNearLimit() {
-        nearLimitDismissed = true
+        nearLimitExpiry?.cancel()
+        nearLimitExpiry = nil
+        if let w = usage.nearLimitWindow, let l = NearLimitRule.level(w.percent) {
+            nearLimitAcked[w.label] = max(nearLimitAcked[w.label] ?? -1, l)
+        }
         recomputeMode()
+    }
+
+    private func startNearLimitExpiry(after seconds: TimeInterval) {
+        nearLimitExpiry?.cancel()
+        nearLimitExpiry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.dismissNearLimit()
+        }
     }
 
     public func setHovering(_ hovering: Bool) {
@@ -566,6 +590,10 @@ public final class AppState: ObservableObject {
         if mode == .usageReset {
             if hovering { usageResetExpiry?.cancel(); usageResetExpiry = nil }
             else { startUsageResetExpiry(after: UsageResetRule.afterHoverLifetime) }
+        }
+        if mode == .nearLimit {
+            if hovering { nearLimitExpiry?.cancel(); nearLimitExpiry = nil }
+            else { startNearLimitExpiry(after: NearLimitRule.afterHoverLifetime) }
         }
         recomputeMode()
     }
@@ -595,7 +623,7 @@ public final class AppState: ObservableObject {
             newMode = .usageReset
         } else if isPinnedExpanded {
             newMode = .expanded
-        } else if isNearLimit && !nearLimitDismissed {
+        } else if nearLimitDue {
             newMode = .nearLimit
         } else if isHovering {
             newMode = .expanded
@@ -610,6 +638,13 @@ public final class AppState: ObservableObject {
         }
         // The usage-reset drop-down's lifetime runs only while it is on screen (it may wait
         // behind a finished / permission drop-down).
+        // Same for the near-limit banner.
+        if newMode == .nearLimit && mode != .nearLimit {
+            if !isHovering { startNearLimitExpiry(after: NearLimitRule.lifetime) }
+        } else if newMode != .nearLimit && mode == .nearLimit {
+            nearLimitExpiry?.cancel()
+            nearLimitExpiry = nil
+        }
         if newMode == .usageReset && mode != .usageReset {
             if !isHovering { startUsageResetExpiry(after: UsageResetRule.lifetime) }
         } else if newMode != .usageReset && mode == .usageReset {

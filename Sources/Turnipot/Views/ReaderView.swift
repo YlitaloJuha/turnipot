@@ -13,6 +13,8 @@ enum ReaderMetrics {
     static let navRow: CGFloat = 26
     static let replyField: CGFloat = 42
     static let footerGap: CGFloat = 6
+    /// Space the footer's confirmation text leaves for the "Open session ↗" button on its right.
+    static let openButtonRoom: CGFloat = 130
     static let bottomPad: CGFloat = 14
     static let scrollTopPad: CGFloat = 4
     static let scrollBottomPad: CGFloat = 12
@@ -331,7 +333,7 @@ struct ReaderView: View {
                         .foregroundStyle(c.tone == .bad ? Theme.red : Theme.green)
                         .lineLimit(1)
                         .transition(.opacity)
-                    Spacer(minLength: 0)
+                    Spacer(minLength: ReaderMetrics.openButtonRoom)
                 } else {
                     Spacer(minLength: 0)
                     navButton("‹ earlier", enabled: index > 0) { ui.readerStep(-1, busy: busy) }
@@ -343,6 +345,12 @@ struct ReaderView: View {
                 }
             }
             .frame(height: ReaderMetrics.navRow)
+            .overlay(alignment: .trailing) {
+                // Claude Desktop sessions already have "Reply in Claude ↗" right under it.
+                if !session.isClaudeDesktop {
+                    OpenSessionButton(help: Fmt.showHelp(session)) { appState.focusSession(id: session.sessionId) }
+                }
+            }
             .animation(.easeInOut(duration: 0.2), value: ui.confirmation)
 
             if session.isClaudeDesktop {
@@ -382,6 +390,34 @@ struct ReaderView: View {
 
 /// The reader's scroll area. Offscreen renders (ImageRenderer can't draw NSScrollView content)
 /// get a clipped top-aligned stack showing the same first screenful.
+/// Footer button in the reader: "Open session ↗" brings the session's terminal forward.
+/// Accent-tinted capsule so it reads as the way out.
+private struct OpenSessionButton: View {
+    let help: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text("Open session")
+                    .font(.system(size: 11.5, weight: .semibold))
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9.5, weight: .bold))
+            }
+            .foregroundStyle(hovering ? Color.white : Theme.accent)
+            .padding(.horizontal, 10)
+            .frame(height: 22)
+            .background(Capsule().fill(Theme.accent.opacity(hovering ? 0.35 : 0.18)))
+            .contentShape(Capsule())
+            .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovering = $0 }
+    }
+}
+
 struct ReaderScroll<Content: View>: View {
     let staticRender: Bool
     @ViewBuilder var content: Content

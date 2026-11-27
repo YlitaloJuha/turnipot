@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1
+
+- Scrolling the session list never opens a chat: it only scrolls the list. Click ≡ on a row to read its reply. Scrolling down still opens the reply from the "finished" drop-down and the "While you were away" summary.
+- The session panel has a big **Mark all read** button under the usage bars while any session is marked done or waiting, instead of the small "· mark all seen" link / ✓ icon in the top bar.
+
+- The reply reader has a clear **Open session ↗** button on the right of its footer (above the reply field) that brings the session's terminal forward, besides the small ↗ in the top bar. Claude Desktop sessions keep **Reply in Claude ↗** for that.
+
+- **Close** and **Mark all read** in the "finished" drop-down close the island instead of opening the session panel under the pointer. The panel's and reader's ✕ also no longer re-open it when the island shrinks out from under a still pointer: hover-to-open waits until the pointer actually moves away.
+
+- The near-limit banner is much quieter: it shows once per usage window at 85%, again at 95% and at 100%, instead of at every 5% step and after every restart. It hides itself after 10 seconds, and **Got it** is remembered across restarts until the window resets. **Got it** also closes the island instead of opening the session panel under the pointer.
+
 ## 0.8.0
 
 - The collapsed pill shows usage as activity-style rings in tones of the pot's orange instead of a percentage: session (outer), week · all, week per model (inner). Hover the rings for the numbers. The near-limit banner shows the same rings instead of "85% wk".

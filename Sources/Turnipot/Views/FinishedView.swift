@@ -150,15 +150,18 @@ struct FinishedView: View {
     /// hover-expand again until the pointer has left the island.
     private func focusAndClose() {
         appState.focusSession(id: session.sessionId)
-        ui.suppressHoverUntilExit = true
         dismiss()
-        appState.setHovering(false)
     }
 
+    /// Close the drop-down and the island (Close, Mark all read, opening the session): the
+    /// pointer is still over the notch, so without dropping the hover the session list would
+    /// open behind it. Like the panel's ✕, no hover-expand until the pointer has left.
     private func dismiss() {
         ui.stickyFinishedId = nil
         if ui.isEditing { ui.releaseKey() }
+        ui.suppressHoverUntilExit = true
         appState.dismissFinished(sessionId: session.sessionId)
+        appState.setHovering(false)
     }
 }
 

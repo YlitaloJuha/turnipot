@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var appState: AppState = {
         let s = AppState(terminal: terminalBridge)
         s.sendGate = terminalBridge.sendGate
+        // Near-limit "Got it"s survive restarts (else every launch shows the banner again).
+        let key = "nearLimitAcked"
+        if let saved = UserDefaults.standard.dictionary(forKey: key) as? [String: Int] { s.nearLimitAcked = saved }
+        s.onNearLimitAckedChange = { UserDefaults.standard.set($0, forKey: key) }
         return s
     }()
     var sessionMonitor: SessionMonitor?
