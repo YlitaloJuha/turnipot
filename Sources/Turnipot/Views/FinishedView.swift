@@ -4,7 +4,9 @@ import NotchCore
 /// "Session finished" drop-down (mockup state 3 + interactions C): hopping mascot and "✓ done"
 /// in the notch strip; session name, "finished · tokens · age"; the last assistant message
 /// (up to 2 lines); quick reply field. Tapping the text focuses the terminal; "Read ⌄" or scrolling
-/// down over the message opens the reply reader; × dismisses.
+/// down over the message opens the reply reader; the bottom row's "Mark all read" clears every
+/// unseen mark and "Close" dismisses. Closes by itself when the session goes busy again
+/// (answered in the terminal / Claude Desktop).
 struct FinishedView: View {
     @ObservedObject var appState: AppState
     let session: ClaudeSession
@@ -38,19 +40,6 @@ struct FinishedView: View {
                 Text("✓ done")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.green)
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.muted)
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                    // Scrolling down over the message opens the reader (click still focuses).
-                    .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
-                }
-                .buttonStyle(.plain)
-                .help("Dismiss")
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -101,25 +90,39 @@ struct FinishedView: View {
             .padding(.bottom, Self.readRowTopGap)
             Spacer(minLength: 0)
 
-            // Bottom center, like a pull-down handle: the reader opens downward from here.
-            Button {
-                openReader()
-            } label: {
-                HStack(spacing: 4) {
-                    Text("Read")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
+            // Bottom row: "Read ⌄" centered like a pull-down handle (the reader opens downward
+            // from here); "Mark all read" and "Close" on its right, clear of the turnip's stage.
+            ZStack {
+                Button {
+                    openReader()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Read")
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                        .contentShape(Capsule())
                 }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.accent.opacity(0.16)))
-                    .contentShape(Capsule())
+                .buttonStyle(.plain)
+                .help("Read the whole reply here (or scroll down over the message)")
+                .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
+
+                HStack(spacing: 4) {
+                    Spacer(minLength: 0)
+                    FooterButton(title: "Mark all read", systemName: "checkmark.circle",
+                                 help: "Clear every done / waiting mark and close") {
+                        appState.markAllSeen()
+                        dismiss()
+                    }
+                    FooterButton(title: "Close", systemName: "xmark", help: "Dismiss") { dismiss() }
+                }
+                .padding(.trailing, 12)
             }
-            .buttonStyle(.plain)
-            .help("Read the whole reply here (or scroll down over the message)")
-            .onHover { ui.setReadTarget(.init(sessionId: session.sessionId, snippet: true), hovering: $0) }
             .frame(maxWidth: .infinity)
             .frame(height: Self.readRowHeight)
             .padding(.bottom, Self.readRowBottomPad)
@@ -156,5 +159,32 @@ struct FinishedView: View {
         ui.stickyFinishedId = nil
         if ui.isEditing { ui.releaseKey() }
         appState.dismissFinished(sessionId: session.sessionId)
+    }
+}
+
+/// Small muted text button for the finished drop-down's bottom row.
+private struct FooterButton: View {
+    let title: String
+    let systemName: String
+    let help: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: systemName).font(.system(size: 9.5, weight: .bold))
+                Text(title).font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(hovering ? Color.white : Theme.muted)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Color.white.opacity(hovering ? 0.12 : 0.06)))
+            .contentShape(Capsule())
+            .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .onHover { hovering = $0 }
     }
 }

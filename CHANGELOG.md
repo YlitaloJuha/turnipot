@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- The collapsed pill shows usage as activity-style rings in tones of the pot's orange instead of a percentage: session (outer), week · all, week per model (inner). Hover the rings for the numbers. The near-limit banner shows the same rings instead of "85% wk".
+- The "finished" drop-down has **Mark all read** (clears every done / waiting mark and closes) and **Close** in its bottom row, next to **Read**; the × in the top right is gone.
+- Prompts answered somewhere else go away by themselves: a permission, question or plan drop-down closes once the transcript shows Claude got its answer (in the terminal or Claude Desktop) or you typed a new prompt, even when the hook wasn't stopped. A "finished" drop-down closes when the session starts working again, even while the pointer holds it open.
+
 ## 0.7.4
 
 - Scrolling the session list no longer opens the chat that ends up under the pointer. After the list scrolls, scrolling only opens a chat once you've moved the pointer onto it, and a row that slides under the pointer mid-scroll never opens. A row also doesn't expand to its full title just because the list scrolled it under the pointer.

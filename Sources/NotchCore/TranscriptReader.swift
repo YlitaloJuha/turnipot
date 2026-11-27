@@ -11,6 +11,11 @@ public struct TranscriptSummary: Equatable, Sendable {
     public var lastPromptAt: Date?
     /// Time of the latest main-chain tool_result line (a tool ran or was denied / interrupted).
     public var lastToolResultAt: Date?
+    /// The latest main-chain tool calls (oldest first, at most `recentToolCallLimit`), with the
+    /// time their tool_result was written: lets a pending notch request see that it was answered
+    /// in the terminal / Claude Desktop instead.
+    public var recentToolCalls: [ToolCallRecord] = []
+    public static let recentToolCallLimit = 24
     public var transcriptPath: String?
     /// Session description: the user's /rename title ("custom-title") if set, otherwise
     /// Claude Code's auto-generated "ai-title". Latest record of each kind wins.
@@ -20,6 +25,17 @@ public struct TranscriptSummary: Equatable, Sendable {
                 lastAssistantAt: Date? = nil, transcriptPath: String? = nil) {
         self.tokens = tokens; self.model = model; self.lastAssistantText = lastAssistantText
         self.lastAssistantAt = lastAssistantAt; self.transcriptPath = transcriptPath
+    }
+}
+
+/// A main-chain tool_use block and when its result arrived (nil while it runs / waits).
+public struct ToolCallRecord: Equatable, Sendable {
+    public var id: String
+    public var name: String
+    public var input: JSONValue
+    public var resultAt: Date?
+    public init(id: String, name: String, input: JSONValue, resultAt: Date? = nil) {
+        self.id = id; self.name = name; self.input = input; self.resultAt = resultAt
     }
 }
 
@@ -237,6 +253,13 @@ public actor TranscriptReader {
                 for block in content where block["type"] as? String == "text" {
                     if let t = block["text"] as? String { texts.append(t) }
                 }
+                for block in content where block["type"] as? String == "tool_use" {
+                    guard let id = block["id"] as? String, let name = block["name"] as? String,
+                          !state.summary.recentToolCalls.contains(where: { $0.id == id }) else { continue }
+                    state.summary.recentToolCalls.append(ToolCallRecord(id: id, name: name, input: JSONValue(any: block["input"])))
+                    let over = state.summary.recentToolCalls.count - TranscriptSummary.recentToolCallLimit
+                    if over > 0 { state.summary.recentToolCalls.removeFirst(over) }
+                }
             } else if let s = message["content"] as? String {
                 texts.append(s)
             }
@@ -284,6 +307,11 @@ public actor TranscriptReader {
         guard content.contains(where: { $0["type"] as? String == "tool_result" }),
               let ts = obj["timestamp"] as? String, let d = parseDate(ts) else { return true }
         if d > (state.summary.lastToolResultAt ?? .distantPast) { state.summary.lastToolResultAt = d }
+        for block in content where block["type"] as? String == "tool_result" {
+            guard let id = block["tool_use_id"] as? String,
+                  let i = state.summary.recentToolCalls.lastIndex(where: { $0.id == id }) else { continue }
+            if state.summary.recentToolCalls[i].resultAt == nil { state.summary.recentToolCalls[i].resultAt = d }
+        }
         return true
     }
 

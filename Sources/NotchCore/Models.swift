@@ -93,6 +93,27 @@ public enum JSONValue: Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// From a JSONSerialization value (NSNumber booleans become .bool).
+    public init(any v: Any?) {
+        switch v {
+        case nil, is NSNull: self = .null
+        case let n as NSNumber:
+            self = CFGetTypeID(n) == CFBooleanGetTypeID() ? .bool(n.boolValue) : .number(n.doubleValue)
+        case let s as String: self = .string(s)
+        case let a as [Any]: self = .array(a.map { JSONValue(any: $0) })
+        case let o as [String: Any]: self = .object(o.mapValues { JSONValue(any: $0) })
+        default: self = .null
+        }
+    }
+
+    /// Objects: every key both sides have holds the same value (Claude Code adds keys to some
+    /// tool inputs before the hook sees them, e.g. ExitPlanMode's plan / planFilePath).
+    /// Anything else: equal.
+    public func sharesValues(with other: JSONValue) -> Bool {
+        guard case .object(let a) = self, case .object(let b) = other else { return self == other }
+        return a.allSatisfy { k, v in b[k].map { $0 == v } ?? true }
+    }
+
     public subscript(key: String) -> JSONValue? {
         if case .object(let o) = self { return o[key] }
         return nil

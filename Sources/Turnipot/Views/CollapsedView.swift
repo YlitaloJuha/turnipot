@@ -2,9 +2,9 @@ import SwiftUI
 import NotchCore
 
 /// Collapsed pill (mockup states 1, 2, 5): left wing = mascot (+ green dot and busy count while
-/// working), center = physical notch (empty), right wing = session usage % + ring while working,
-/// red "91% wk" + red ring when near the limit, else the muted session count (none with no
-/// sessions: the pill is one-sided then, PillLayout.oneSided).
+/// working), center = physical notch (empty), right wing = activity-style usage rings (session,
+/// week, week per model) while working / unseen / near the limit, else the muted session count
+/// (none with no sessions: the pill is one-sided then, PillLayout.oneSided).
 /// While finished sessions are unseen, an orange "2 done" / amber "1 waiting" badge follows the
 /// mascot (and the busy count); the wings grow to fit it (PillLayout).
 struct CollapsedView: View {
@@ -33,14 +33,9 @@ struct CollapsedView: View {
     }
 
     /// Which right-wing variant is showing (drives its cross-fade).
-    private var rightKey: Int {
-        if appState.usage.nearLimitWindow != nil { return 2 }
-        return (appState.isAnyBusy || appState.hasUnseen) && (appState.usage.sessionWindow ?? appState.usage.windows.first) != nil ? 1 : 0
-    }
+    private var rightKey: Int { PillLayout.showsRings(appState: appState) ? 1 : 0 }
 
-    private var rightPercent: Int {
-        (appState.usage.nearLimitWindow ?? appState.usage.sessionWindow ?? appState.usage.windows.first)?.percent ?? 0
-    }
+    private var rightPercent: Int { appState.usage.windows.map(\.percent).reduce(0, +) }
 
     private var badge: PillBadge? { PillLayout.badge(appState: appState, ui: ui) }
 
@@ -73,25 +68,12 @@ struct CollapsedView: View {
     }
 
     @ViewBuilder private var rightWing: some View {
-        HStack(spacing: PillLayout.usageGap) {
-            if let w = appState.usage.nearLimitWindow {
-                Text("\(w.percent)% \(Fmt.usageShortLabel(w.label))")
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Theme.red)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .contentTransition(.numericText(value: Double(w.percent)))
-                    .transition(.opacity)
-                UsageRing(percent: w.percent, color: Theme.red)
-                    .transition(.opacity)
-            } else if appState.isAnyBusy || appState.hasUnseen, let w = appState.usage.sessionWindow ?? appState.usage.windows.first {
-                Text("\(w.percent)%")
-                    .font(.system(size: 12).monospacedDigit())
-                    .foregroundStyle(appState.usage.stale ? Theme.muted.opacity(0.6) : Theme.muted)
-                    .contentTransition(.numericText(value: Double(w.percent)))
-                    .transition(.opacity)
-                UsageRing(percent: w.percent, color: Fmt.usageColor(w.percent))
-                    .transition(.opacity)
+        HStack(spacing: 0) {
+            if PillLayout.showsRings(appState: appState) {
+                UsageRings(percents: appState.usage.windows.map(\.percent))
+                    .opacity(appState.usage.stale ? 0.55 : 1)
+                    .help(ringsHelp)
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
             } else if !PillLayout.oneSided(appState: appState) {
                 Text("\(appState.sessions.count)")
                     .font(.system(size: 12).monospacedDigit())
@@ -101,6 +83,12 @@ struct CollapsedView: View {
             }
         }
         .padding(.trailing, PillLayout.rightTrailingPad)
+    }
+
+    private var ringsHelp: String {
+        appState.usage.windows.prefix(UsageRings.maxRings)
+            .map { "\(Fmt.usageLabel($0.label)) \($0.percent)%" }
+            .joined(separator: " · ")
     }
 }
 

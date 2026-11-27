@@ -199,8 +199,10 @@ public final class AppState: ObservableObject {
                         addEvent(.sessionFinished(sessionId: s.sessionId), lifetime: NotchConstants.finishedDisplayDuration)
                     }
                 } else if s.status == .busy && prev.status != .busy {
-                    // Continued (e.g. from the terminal): no longer "unseen".
+                    // Continued (e.g. answered in the terminal / Claude Desktop): no longer
+                    // "unseen", and its finished drop-down has nothing left to ask.
                     markSeenInternal(s.sessionId)
+                    events.removeAll { $0.kind == .sessionFinished(sessionId: s.sessionId) }
                 }
             } else if !old.isEmpty || !sessions.isEmpty {
                 addEvent(.sessionStarted(sessionId: s.sessionId), lifetime: 3)
@@ -261,6 +263,11 @@ public final class AppState: ObservableObject {
         if let t = summary.title { s.title = t }
         s.transcriptPath = summary.transcriptPath
         if s != sessions[i] { sessions[i] = s }
+        // Answered in the terminal / Claude Desktop instead (the hook may not have been stopped):
+        // drop the drop-down once the transcript shows the call's result or a newer prompt.
+        for p in pendingPermissions where p.sessionId == sessionId && Self.answeredElsewhere(p, summary: summary) {
+            resolvePermission(id: p.id, decision: .ask, handedBack: false)
+        }
         if terminalDialogs.isOpen(sessionId) {
             let progress = [summary.lastAssistantAt, summary.lastToolResultAt].compactMap { $0 }.max()
             var g = terminalDialogs
@@ -360,15 +367,27 @@ public final class AppState: ObservableObject {
 
     // MARK: UI actions
 
-    /// Answer a pending permission. No-op if already resolved.
-    public func resolvePermission(id: UUID, decision: PermissionDecision) {
+    /// True when `summary` shows `request` was settled outside the notch: a result for a matching
+    /// tool call written after the request arrived, or a new prompt typed since.
+    nonisolated public static func answeredElsewhere(_ request: PermissionRequest, summary: TranscriptSummary) -> Bool {
+        let since = request.receivedAt.addingTimeInterval(-1)
+        if let p = summary.lastPromptAt, p > request.receivedAt { return true }
+        return summary.recentToolCalls.contains {
+            $0.name == request.toolName && ($0.resultAt.map { $0 > since } ?? false)
+                && $0.input.sharesValues(with: request.toolInput)
+        }
+    }
+
+    /// Answer a pending permission. No-op if already resolved. `handedBack: false` when it was
+    /// already answered elsewhere (no Claude dialog is left open in the terminal).
+    public func resolvePermission(id: UUID, decision: PermissionDecision, handedBack: Bool = true) {
         permissionTimeouts.removeValue(forKey: id)?.cancel()
         let responder = permissionResponders.removeValue(forKey: id)
         let request = permission(id: id)
         pendingPermissions.removeAll { $0.id == id }
         // Handed back to the terminal (timeout, "Open session", "Answer in terminal", the hook
         // disconnecting): Claude's own dialog may be up there now.
-        if let request, responder != nil, case .ask = decision {
+        if handedBack, let request, responder != nil, case .ask = decision {
             noteHandedBack(sessionId: request.sessionId, requestAt: request.receivedAt)
         }
         responder?(decision)
