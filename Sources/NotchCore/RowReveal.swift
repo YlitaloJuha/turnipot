@@ -21,7 +21,9 @@ public enum RelativeTime {
 /// Hover-to-reveal for session rows: after the pointer rests on one row for `delay` seconds,
 /// that row shows its truncated text in full; leaving it (or moving to another row) hides it
 /// again. A fast sweep never reveals anything: every enter restarts the clock and only the
-/// row still hovered when the delay has passed is revealed. Clock-free (callers pass times).
+/// row still hovered when the delay has passed is revealed. Scrolling the list hides any reveal
+/// and parks it: rows sliding under a still pointer never reveal; the clock only starts once
+/// the pointer itself moves again. Clock-free (callers pass times).
 public struct RowReveal: Equatable, Sendable {
     public static let defaultDelay: TimeInterval = 1.5
 
@@ -31,6 +33,8 @@ public struct RowReveal: Equatable, Sendable {
     public private(set) var hoveredSince: TimeInterval = 0
     /// Row currently shown in full.
     public private(set) var revealed: String?
+    /// The list scrolled since the pointer last moved: nothing reveals until it moves.
+    public private(set) var parked = false
 
     public init(delay: TimeInterval = RowReveal.defaultDelay) { self.delay = delay }
 
@@ -51,10 +55,26 @@ public struct RowReveal: Equatable, Sendable {
         if revealed == id { revealed = nil }
     }
 
+    /// The list scrolled: hide the reveal and wait for the pointer to move.
+    public mutating func scrolled() {
+        parked = true
+        revealed = nil
+    }
+
+    /// The pointer moved at `now`. After a scroll this restarts the clock on the hovered row and
+    /// returns when to call `tick`; otherwise nil (hover enters already scheduled it).
+    @discardableResult
+    public mutating func pointerMoved(at now: TimeInterval) -> TimeInterval? {
+        guard parked else { return nil }
+        parked = false
+        hoveredSince = now
+        return hovered == nil ? nil : now + delay
+    }
+
     /// Re-evaluate at `now`; returns the row to reveal (nil = none).
     @discardableResult
     public mutating func tick(at now: TimeInterval) -> String? {
-        if let h = hovered, now - hoveredSince >= delay - 1e-9 { revealed = h }
+        if !parked, let h = hovered, now - hoveredSince >= delay - 1e-9 { revealed = h }
         return revealed
     }
 
@@ -67,5 +87,6 @@ public struct RowReveal: Equatable, Sendable {
     public mutating func reset() {
         hovered = nil
         revealed = nil
+        parked = false
     }
 }

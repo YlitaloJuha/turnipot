@@ -274,11 +274,11 @@ final class NotchWindowController {
 
     private func installMouseMonitors() {
         let moveMask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
-        if let m = NSEvent.addGlobalMonitorForEvents(matching: moveMask, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateMouseState() }
+        if let m = NSEvent.addGlobalMonitorForEvents(matching: moveMask, handler: { [weak self] e in
+            MainActor.assumeIsolated { self?.updateMouseState(); self?.pointerMoved(e) }
         }) { monitors.append(m) }
         if let m = NSEvent.addLocalMonitorForEvents(matching: moveMask, handler: { [weak self] e in
-            MainActor.assumeIsolated { self?.updateMouseState() }
+            MainActor.assumeIsolated { self?.updateMouseState(); self?.pointerMoved(e) }
             return e
         }) { monitors.append(m) }
         // Click anywhere outside our panel: end editing, unpin.
@@ -388,12 +388,19 @@ final class NotchWindowController {
         let p = currentPresentation
         if case .reader = p { return handleReaderScroll(e, isNewGesture: isNewGesture) }
         backGesture.reset()
+        if case .expanded = p { noteListPosition(refresh: isNewGesture) }
         if isNewGesture {
             scrollAccum = 0
             scrollGestureDone = false
             scrollGestureAllowed = !scrollGestureOverReplyField && scrollGestureCanTrigger(p)
+            gestureReadTarget = ui.readTarget
+            // The list scrolled under a still pointer: the row under it now is wherever the
+            // scroll left it, not one the user pointed at. Move the pointer first.
+            if case .expanded = p, listScrolledUnderPointer { scrollGestureAllowed = false }
         }
         guard e.momentumPhase.isEmpty, !scrollGestureDone, scrollGestureAllowed else { return false }
+        // A row (or its read button) that slid under the pointer mid-gesture never opens.
+        guard ui.readTarget == gestureReadTarget else { return false }
         let dy = e.hasPreciseScrollingDeltas ? e.scrollingDeltaY : e.scrollingDeltaY * 8
         scrollAccum += dy
         switch p {
@@ -464,6 +471,39 @@ final class NotchWindowController {
 
     /// Snapshot at gesture start: may this gesture open / leave the reader?
     private var scrollGestureAllowedForList = false
+    /// Read target under the pointer when the gesture began.
+    private var gestureReadTarget: NotchUIState.ReadTarget?
+    /// The session list moved since the pointer last moved (see noteListPosition / pointerMoved).
+    private var listScrolledUnderPointer = false
+    private var pointerTravelSinceListScroll: CGFloat = 0
+    private weak var listScrollView: NSScrollView?
+    private var lastListOriginY: CGFloat?
+
+    /// Called on every scroll event while the list shows (before the event is applied): if the
+    /// list's offset changed since the previous event, it scrolled under the pointer.
+    private func noteListPosition(refresh: Bool) {
+        if refresh || listScrollView?.window == nil {
+            let found = mainScrollView()
+            if found !== listScrollView { lastListOriginY = nil }    // panel reopened / view rebuilt
+            listScrollView = found
+        }
+        guard let s = listScrollView else { return }
+        let y = s.contentView.bounds.origin.y
+        if let last = lastListOriginY, abs(y - last) > 0.5 {
+            listScrolledUnderPointer = true
+            pointerTravelSinceListScroll = 0
+            ui.rowListScrolled()
+        }
+        lastListOriginY = y
+    }
+
+    /// Real pointer movement (a few points, not hand jitter on the wheel) re-arms scroll-to-read.
+    private func pointerMoved(_ e: NSEvent) {
+        ui.pointerMoved()
+        guard listScrolledUnderPointer else { return }
+        pointerTravelSinceListScroll += abs(e.deltaX) + abs(e.deltaY)
+        if pointerTravelSinceListScroll >= 4 { listScrolledUnderPointer = false }
+    }
 
     private func scrollGestureCanTrigger(_ p: Presentation) -> Bool {
         switch p {

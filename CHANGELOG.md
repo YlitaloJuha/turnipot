@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.4
+
+- Scrolling the session list no longer opens the chat that ends up under the pointer. After the list scrolls, scrolling only opens a chat once you've moved the pointer onto it, and a row that slides under the pointer mid-scroll never opens. A row also doesn't expand to its full title just because the list scrolled it under the pointer.
+
 ## 0.7.3
 
 - Turnipot has an app icon (the turnip in its pot) in Finder, Launchpad, the DMG and Login Items, instead of the generic one. The editor extension (Turnipot Bridge 0.2.1) shows it too in the editor's Extensions list.
