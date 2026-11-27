@@ -47,6 +47,35 @@ struct UsageRing: View {
     }
 }
 
+/// Activity-style concentric rings, one per usage window (outermost = first window: session,
+/// then the weekly ones), each in its own tone of the pot's orange (`Theme.ringColor`) over a dim track. Up to `maxRings`.
+struct UsageRings: View {
+    var percents: [Int]
+    var size: CGFloat = PillLayout.ringsSize
+    var lineWidth: CGFloat = 2.6
+    var gap: CGFloat = 0.9
+    static let maxRings = 3
+
+    var body: some View {
+        ZStack {
+            ForEach(Array(percents.prefix(Self.maxRings).enumerated()), id: \.offset) { i, pct in
+                let color = Theme.ringColor(i)
+                let d = size - lineWidth - CGFloat(i) * 2 * (lineWidth + gap)
+                ZStack {
+                    Circle().stroke(color.opacity(0.22), lineWidth: lineWidth)
+                    Circle()
+                        .trim(from: 0, to: max(0.001, min(CGFloat(max(pct, 0)) / 100, 1)))
+                        .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeOut(duration: 0.5), value: pct)
+                }
+                .frame(width: max(d, 1), height: max(d, 1))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// Small rounded label (mockup `.chip`, `.chip.g`, `.chip.a`).
 struct Chip: View {
     enum Style { case neutral, green, amber }

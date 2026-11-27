@@ -45,6 +45,9 @@ enum Theme {
     static let green  = Color(hex: 0x4ade80)
     static let amber  = Color(hex: 0xfbbf24)
     static let red    = Color(hex: 0xf87171)
+    /// Usage ring tones, outermost first: the pot's light rim, the pot, the pot's shadow.
+    static let rings: [Color] = [Color(hex: TurnipRig.rimHex), Color(hex: TurnipRig.potHex), Color(hex: TurnipRig.potDarkHex)]
+    static func ringColor(_ i: Int) -> Color { rings[min(max(i, 0), rings.count - 1)] }
     static let muted  = Color(hex: 0x8a8a8f)
     static let card   = Color(hex: 0x16161a)
     static let cardBorder = Color(hex: 0x2c2c32)

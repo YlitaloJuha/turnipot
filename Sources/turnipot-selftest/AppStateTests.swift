@@ -50,4 +50,54 @@ func registerAppStateTests() {
         app.dismissNearLimit()
         expectEqual(app.mode, .expanded, "near limit: after Got it, hover opens the panel again")
     }
+
+    // Answered outside the notch (terminal / Claude Desktop): the drop-down closes itself.
+    do {
+        let iso = ISO8601DateFormatter()
+        let asked = iso.date(from: "2026-11-27T10:00:10Z")!
+        let q = PermissionRequest(sessionId: "s", toolName: "AskUserQuestion", summary: "q",
+                                  toolInput: .object(["questions": .array([.object(["question": .string("Which?")])])]),
+                                  raw: .null, receivedAt: asked)
+        func parsed(_ lines: [Substring]) -> TranscriptSummary {
+            var st = TranscriptReader.ParseState()
+            TranscriptReader.parse(lines: lines, into: &st)
+            return st.summary
+        }
+        let use: Substring = #"{"type":"assistant","timestamp":"2026-11-27T10:00:09.000Z","message":{"id":"m1","model":"claude-x","content":[{"type":"tool_use","id":"tq","name":"AskUserQuestion","input":{"questions":[{"question":"Which?"}]}}]}}"#
+        let result: Substring = #"{"type":"user","timestamp":"2026-11-27T10:00:30.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tq","content":"A"}]}}"#
+        let pending = parsed([use])
+        expectEqual(pending.recentToolCalls.map(\.id), ["tq"], "elsewhere: tool_use recorded")
+        check("elsewhere: no result yet -> still pending", !AppState.answeredElsewhere(q, summary: pending))
+        let answered = parsed([use, result])
+        expectEqual(answered.recentToolCalls.first?.resultAt, iso.date(from: "2026-11-27T10:00:30Z"), "elsewhere: result time")
+        check("elsewhere: result after the request -> answered", AppState.answeredElsewhere(q, summary: answered))
+        let otherUse: Substring = #"{"type":"assistant","timestamp":"2026-11-27T10:00:09.000Z","message":{"id":"m2","model":"claude-x","content":[{"type":"tool_use","id":"tq","name":"AskUserQuestion","input":{"questions":[{"question":"Other?"}]}}]}}"#
+        check("elsewhere: different input -> not this request", !AppState.answeredElsewhere(q, summary: parsed([otherUse, result])))
+        let early: Substring = #"{"type":"user","timestamp":"2026-11-27T09:59:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tq","content":"A"}]}}"#
+        check("elsewhere: older identical call -> not this request", !AppState.answeredElsewhere(q, summary: parsed([use, early])))
+        var prompted = pending
+        prompted.lastPromptAt = iso.date(from: "2026-11-27T10:00:40Z")
+        check("elsewhere: new prompt since -> answered", AppState.answeredElsewhere(q, summary: prompted))
+
+        MainActor.assumeIsolated {
+            let app = AppState()
+            let t0 = asked.addingTimeInterval(-60)
+            app.updateSessions([ClaudeSession(pid: 1, sessionId: "s", cwd: "/x", name: "s", status: .busy, startedAt: t0, updatedAt: t0)])
+            var got: PermissionDecision?
+            app.enqueuePermission(q) { got = $0 }
+            app.updateTranscript(sessionId: "s", summary: pending)
+            expectEqual(app.pendingPermissions.count, 1, "elsewhere: drop-down stays while unanswered")
+            app.updateTranscript(sessionId: "s", summary: answered)
+            check("elsewhere: drop-down closed", app.pendingPermissions.isEmpty)
+            check("elsewhere: hook told ask", { if case .ask? = got { return true }; return false }())
+            check("elsewhere: quick reply not blocked", !app.terminalDialogMayBeOpen("s"))
+
+            // A finished drop-down goes away when the session continues (answered elsewhere).
+            app.updateSessions([ClaudeSession(pid: 1, sessionId: "s", cwd: "/x", name: "s", status: .idle, startedAt: t0, updatedAt: t0)])
+            expectEqual(app.mode, .finished(sessionId: "s"), "continue: finished drop-down shown")
+            app.updateSessions([ClaudeSession(pid: 1, sessionId: "s", cwd: "/x", name: "s", status: .busy, startedAt: t0, updatedAt: t0)])
+            expectEqual(app.mode, .collapsed, "continue: busy again closes the finished drop-down")
+            check("continue: no longer unseen", !app.hasUnseen)
+        }
+    }
 }

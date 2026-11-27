@@ -1,7 +1,7 @@
 import SwiftUI
 import NotchCore
 
-/// Near-limit banner (mockup state 5, dropped down): sweating mascot, "91% wk" + red ring in the
+/// Near-limit banner (mockup state 5, dropped down): sweating mascot, the usage rings in the
 /// strip, the window's bar and reset time, and a "Got it" button -> dismissNearLimit().
 struct NearLimitView: View {
     @ObservedObject var appState: AppState
@@ -13,10 +13,8 @@ struct NearLimitView: View {
             NotchStrip(height: ui.geometry.notchHeight) {
                 MascotView(mood: .sweat, pixelSize: MascotView.pixelSize(forStrip: ui.geometry.notchHeight))
             } trailing: {
-                Text("\(window.percent)% \(Fmt.usageShortLabel(window.label))")
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Theme.red)
-                UsageRing(percent: window.percent, color: Theme.red)
+                // Same rings as the collapsed pill (the numbers are in the banner below).
+                UsageRings(percents: appState.usage.windows.map(\.percent))
             }
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {

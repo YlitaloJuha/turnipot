@@ -310,7 +310,8 @@ enum Presentation: Equatable {
         if case .reader(let sid) = appState.mode, appState.session(id: sid) != nil { return .reader(sessionId: sid) }
         if ui.confirmation != nil { return .confirmation }
         if appState.mode == .awaySummary, appState.awaySummary != nil { return .awaySummary }
-        if let sid = ui.stickyFinishedId, appState.session(id: sid) != nil {
+        // Held open by hover, but not once the session is working again (answered elsewhere).
+        if let sid = ui.stickyFinishedId, let s = appState.session(id: sid), s.status != .busy {
             return .finished(sessionId: sid)
         }
         switch appState.mode {
@@ -644,26 +645,21 @@ enum PillLayout {
         return w + trailingPad
     }
 
-    /// Right wing: usage text + ring (CollapsedView.rightWing), e.g. "100% 5h" near the limit.
-    static let usageGap: CGFloat = 6
-    static let ringSize: CGFloat = 18
+    /// Right wing: activity-style usage rings (CollapsedView.rightWing), no text.
+    static let ringsSize: CGFloat = 24
     static let rightTrailingPad: CGFloat = 10
-    /// Clearance between the physical notch and the right wing's text: the notch's rounded bottom
-    /// corner (and any rounding in the measured notch width) otherwise clips its first digit.
+    /// Clearance between the physical notch and the right wing's content (the notch's rounded
+    /// bottom corner).
     static let rightLeadingPad: CGFloat = 8
-    static let usageFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+
+    /// Whether the right wing shows the usage rings (else the muted session count, or nothing).
+    static func showsRings(appState: AppState) -> Bool {
+        !appState.usage.windows.isEmpty && (appState.isNearLimit || appState.isAnyBusy || appState.hasUnseen)
+    }
 
     static func rightWidth(appState: AppState) -> CGFloat {
-        let text: String, font: NSFont
-        if let w = appState.usage.nearLimitWindow {
-            text = "\(w.percent)% \(Fmt.usageShortLabel(w.label))"; font = countFont
-        } else if appState.isAnyBusy || appState.hasUnseen,
-                  let w = appState.usage.sessionWindow ?? appState.usage.windows.first {
-            text = "\(w.percent)%"; font = usageFont
-        } else {
-            return 0   // session count only: always fits
-        }
-        return rightLeadingPad + textWidth(text, font: font) + usageGap + ringSize + rightTrailingPad
+        guard showsRings(appState: appState) else { return 0 }   // session count only: always fits
+        return rightLeadingPad + ringsSize + rightTrailingPad
     }
 
     static func badge(appState: AppState, ui: NotchUIState) -> PillBadge? {
