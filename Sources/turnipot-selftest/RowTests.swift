@@ -79,6 +79,19 @@ func registerRowTests() {
     expectEqual(r.tick(at: 1.5), "a", "repeated enter keeps the original time")
     r.reset()
     check("reset", r.revealed == nil && r.hovered == nil)
+    // Scrolling hides the reveal; rows scrolled under a still pointer never reveal.
+    r = RowReveal(delay: 1.5)
+    r.enter("a", at: 0)
+    expectEqual(r.tick(at: 1.5), "a", "revealed before scrolling")
+    r.scrolled()
+    expectEqual(r.revealed, nil, "scroll hides the reveal")
+    r.enter("b", at: 2)
+    expectEqual(r.tick(at: 10), nil, "no reveal while parked after a scroll")
+    expectEqual(r.pointerMoved(at: 10), 11.5, "pointer move restarts the clock")
+    expectEqual(r.tick(at: 11), nil, "not before the delay after moving")
+    expectEqual(r.tick(at: 11.5), "b", "revealed after resting post-move")
+    expectEqual(r.pointerMoved(at: 12), nil, "moves without a scroll schedule nothing")
+
     expectEqual(RowReveal.defaultDelay, 1.5, "reveal delay")
 
     // Wrapped line counts (capped at 3).

@@ -57,16 +57,33 @@ final class NotchUIState: ObservableObject {
     func rowHover(_ id: String, inside: Bool) {
         let now = ProcessInfo.processInfo.systemUptime
         if inside {
-            let due = rowReveal.enter(id, at: now)
-            revealTask?.cancel()
-            revealTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64(max(0, due - now) * 1_000_000_000))
-                guard !Task.isCancelled, let self else { return }
-                self.applyReveal(self.rowReveal.tick(at: ProcessInfo.processInfo.systemUptime))
-            }
+            scheduleRevealTick(due: rowReveal.enter(id, at: now), now: now)
         } else {
             rowReveal.leave(id)
             applyReveal(rowReveal.revealed)
+        }
+    }
+
+    /// The list scrolled: rows slide under the pointer, so none reveals until the pointer moves.
+    func rowListScrolled() {
+        rowReveal.scrolled()
+        revealTask?.cancel()
+        applyReveal(nil)
+    }
+
+    /// Pointer moved (any mouse-move event): resumes hover-to-reveal after a scroll.
+    func pointerMoved() {
+        guard rowReveal.parked else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if let due = rowReveal.pointerMoved(at: now) { scheduleRevealTick(due: due, now: now) }
+    }
+
+    private func scheduleRevealTick(due: TimeInterval, now: TimeInterval) {
+        revealTask?.cancel()
+        revealTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(max(0, due - now) * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.applyReveal(self.rowReveal.tick(at: ProcessInfo.processInfo.systemUptime))
         }
     }
 
