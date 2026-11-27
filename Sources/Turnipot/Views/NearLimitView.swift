@@ -30,7 +30,13 @@ struct NearLimitView: View {
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
-                Button("Got it") { appState.dismissNearLimit() }
+                Button("Got it") {
+                    // The pointer is still over the notch: without dropping the hover the session
+                    // list would open in the banner's place. Like ✕: no hover-expand until it leaves.
+                    ui.suppressHoverUntilExit = true
+                    appState.dismissNearLimit()
+                    appState.setHovering(false)
+                }
                     .buttonStyle(NotchButtonStyle(hPad: 12, vPad: 6, radius: 9))
             }
             .padding(.horizontal, 18)

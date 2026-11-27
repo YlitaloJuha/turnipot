@@ -19,7 +19,7 @@ struct ExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar (notch row): left of the notch the "SESSIONS N · mark all seen" header and
+            // Top bar (notch row): left of the notch the "SESSIONS N" header and
             // the pill's mascot (drawn by IslandView at the pill's exact position); right of the
             // notch only icon buttons: stale-usage marker, ⚙ settings menu, pin, ✕.
             HStack(spacing: 0) {
@@ -29,23 +29,7 @@ struct ExpandedView: View {
                         HStack(spacing: 6) { sessionsLabel; countLabel }
                         countLabel
                     }
-                    if appState.hasUnseen && markAllSeenFitsInHeader {
-                        Button {
-                            appState.markAllSeen()
-                        } label: {
-                            Text("· mark all seen")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Theme.accent)
-                                .lineLimit(1)
-                                .fixedSize()
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Clear the highlight on every finished session")
-                        .transition(.opacity)
-                    }
                 }
-                .animation(.easeInOut(duration: 0.2), value: appState.hasUnseen)
                 .frame(width: headerWidth, alignment: .leading)
                 .clipped()
 
@@ -59,10 +43,6 @@ struct ExpandedView: View {
                             .foregroundStyle(Theme.amber)
                             .frame(width: 18, height: 20)
                             .help("Account usage \(staleText)")
-                    }
-                    if appState.hasUnseen && !markAllSeenFitsInHeader {
-                        // No room beside the mascot: "mark all seen" as an icon.
-                        BarIconButton(systemName: "checkmark.circle", help: "Mark all seen") { appState.markAllSeen() }
                     }
                     SettingsMenuButton(appState: appState, ui: ui)
                     BarIconButton(systemName: appState.isPinnedExpanded ? "pin.fill" : "pin",
@@ -190,6 +170,11 @@ struct ExpandedView: View {
                     .opacity(appState.usage.stale ? 0.7 : 1)
                 }
             }
+            if appState.hasUnseen {
+                MarkAllReadButton { appState.markAllSeen() }
+                    .padding(.top, ExpandedMetrics.markAllReadGap)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -208,15 +193,6 @@ struct ExpandedView: View {
             .contentTransition(.numericText())
             .fixedSize()
             .help("\(appState.sessions.count) sessions")
-    }
-
-    /// "SESSIONS N · mark all seen" fits left of the mascot (else ✓ goes to the right side).
-    private var markAllSeenFitsInHeader: Bool {
-        let semibold = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        let w = PillLayout.textWidth("SESSIONS", font: semibold) + 6
-            + PillLayout.textWidth("\(appState.sessions.count)", font: semibold)
-            + PillLayout.textWidth("· mark all seen", font: NSFont.systemFont(ofSize: 11)) + 12
-        return w <= headerWidth
     }
 
     /// Room for the header between the left padding and the shared mascot.
@@ -296,8 +272,7 @@ struct SessionRow: View {
                         .lineLimit(lines)
                         .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: revealed)
-                        // Scrolling over the snippet always opens the reader (never the list).
-                        .onHover { ui.setReadTarget(.init(sessionId: id, snippet: true), hovering: $0) }
+                        .onHover { ui.setReadTarget(.init(sessionId: id, snippet: false), hovering: $0) }
                 }
             }
             // Revealed: exactly the width ExpandedMetrics measured the wrapped text with.
@@ -321,7 +296,7 @@ struct SessionRow: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Read reply (or scroll)")
+                .help("Read reply")
                 .onHover { ui.setReadTarget(.init(sessionId: id, snippet: true), hovering: $0) }
                 let dialogOpen = appState.terminalDialogMayBeOpen(id)
                 Button {
@@ -542,6 +517,30 @@ final class SproutPipsNSView: NSView {
             pip.add(a, forKey: "wave")
             root.addSublayer(pip)
         }
+    }
+}
+
+/// "✓ Mark all read" under the usage bars while any session is marked done / waiting: clears
+/// every mark (same as the finished drop-down's button). Full column width, accent-tinted.
+private struct MarkAllReadButton: View {
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .semibold))
+                Text("Mark all read").font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(hovering ? Color.white : Theme.accent)
+            .frame(maxWidth: .infinity)
+            .frame(height: ExpandedMetrics.markAllReadHeight)
+            .background(Capsule().fill(Theme.accent.opacity(hovering ? 0.35 : 0.18)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Clear the done / waiting mark on every session")
+        .onHover { hovering = $0 }
     }
 }
 

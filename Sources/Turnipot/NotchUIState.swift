@@ -101,7 +101,12 @@ final class NotchUIState: ObservableObject {
     @Published var readerBackProgress: Double = 0
     /// Set by the panel's close button: ignore hover-expand until the pointer has left the
     /// island once (NotchWindowController clears it on exit), so closing doesn't bounce open.
-    var suppressHoverUntilExit = false
+    /// Setting it remembers where the pointer was: an "exit" only counts once the pointer has
+    /// moved away from there (the island shrinking out from under a still pointer isn't one).
+    var suppressHoverUntilExit = false {
+        didSet { if suppressHoverUntilExit { suppressHoverPointer = NSEvent.mouseLocation } }
+    }
+    var suppressHoverPointer: CGPoint?
     /// The pointer has been over the "While you were away" drop-down: leaving it dismisses it.
     var awaySummaryHovered = false
     /// When the away summary appeared (clicks elsewhere in the first moments don't dismiss it:
@@ -405,6 +410,9 @@ enum ExpandedMetrics {
     static let hero: CGFloat = 56
     static let topPad: CGFloat = 4
     static let accountTopInset: CGFloat = 6
+    /// "Mark all read" button under the usage bars (while anything is unseen).
+    static let markAllReadHeight: CGFloat = 26
+    static let markAllReadGap: CGFloat = 8
     static let bottomPad: CGFloat = 18
     static let maxVisibleRows = 6
     /// Subagent rows under a session row, and the gap after the last one.
@@ -494,6 +502,7 @@ enum ExpandedMetrics {
         let sessionsH = min(sessionsContentHeight(appState: appState, ui: ui), sessionsViewportMax(strip: strip))
         let windows = CGFloat(max(appState.usage.windows.count, 1))
         let usageH = accountTopInset + windows * usageRow   // headers live in the notch row
+            + (appState.hasUnseen ? markAllReadGap + markAllReadHeight : 0)
         let h = strip + topPad + max(sessionsH, usageH) + bottomPad
         return min(max(h, 180), NotchGeometry.expandedSize.height)
     }

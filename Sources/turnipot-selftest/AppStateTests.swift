@@ -51,6 +51,40 @@ func registerAppStateTests() {
         expectEqual(app.mode, .expanded, "near limit: after Got it, hover opens the panel again")
     }
 
+    // Near-limit banner: once per level, remembered until the window resets.
+    MainActor.assumeIsolated {
+        func snap(_ p: Int, _ label: String = "week") -> UsageSnapshot {
+            UsageSnapshot(windows: [UsageWindow(label: label, percent: p, resetsText: "")], fetchedAt: Date(), stale: false)
+        }
+        expectEqual(NearLimitRule.level(84), nil, "near-limit level: under 85")
+        expectEqual(NearLimitRule.level(88), 0, "near-limit level: 85")
+        expectEqual(NearLimitRule.level(97), 1, "near-limit level: 95")
+        expectEqual(NearLimitRule.level(100), 2, "near-limit level: 100")
+        let app = AppState()
+        var saved: [String: Int]?
+        app.onNearLimitAckedChange = { saved = $0 }
+        app.updateUsage(snap(86))
+        expectEqual(app.mode, .nearLimit, "near limit: shown at 86%")
+        app.dismissNearLimit()
+        expectEqual(saved, ["week": 0], "near limit: Got it is saved")
+        for p in [87, 89, 91, 94] {
+            app.updateUsage(snap(p))
+            expectEqual(app.mode, .collapsed, "near limit: no repeat at \(p)%")
+        }
+        app.updateUsage(snap(95))
+        expectEqual(app.mode, .nearLimit, "near limit: shown again at 95%")
+        app.dismissNearLimit()
+        app.updateUsage(snap(10))
+        expectEqual(saved, [:], "near limit: reset clears the acknowledgement")
+        app.dismissUsageReset()
+        app.updateUsage(snap(86))
+        expectEqual(app.mode, .nearLimit, "near limit: next period shows it again")
+        let restarted = AppState()
+        restarted.nearLimitAcked = ["week": 0]
+        restarted.updateUsage(snap(90))
+        expectEqual(restarted.mode, .collapsed, "near limit: acknowledged before a restart stays quiet")
+    }
+
     // Answered outside the notch (terminal / Claude Desktop): the drop-down closes itself.
     do {
         let iso = ISO8601DateFormatter()
