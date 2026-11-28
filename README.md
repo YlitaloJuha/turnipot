@@ -41,9 +41,9 @@ Turnipot puts all of that where your eyes already are: the notch. Hover for the 
 
 ### Every session, one glance
 
-The pill around the notch shows how many sessions are busy, your 5-hour usage, and a badge when something finished while you weren't looking. Hover to open the panel: each session with its status and **current context size** (compaction-aware: it drops right after `/compact`), plus your **account usage** for the 5-hour window and the week. When a window you had used at least half of resets, the notch drops down to tell you and the turnip gets watered (if you were away, it's a row in the **While you were away** summary).
+The pill around the notch shows how many sessions are busy, your usage as rings (5-hour session outside, the week inside; hover them for the numbers), and a badge when something finished while you weren't looking. Hover to open the panel: each session with its status and **current context size** (compaction-aware: it drops right after `/compact`), plus your **account usage** for the 5-hour window and the week. When a window you had used at least half of resets, the notch drops down to tell you and the turnip gets watered (if you were away, it's a row in the **While you were away** summary).
 
-<p align="center"><img src="docs/media/pills.png" width="820" alt="The pill when idle, working, and with two finished sessions"></p>
+<p align="center"><img src="docs/media/pills.png" width="820" alt="The pill when idle, working with its usage rings, and with two finished sessions"></p>
 <p align="center"><img src="docs/media/expanded.png" width="820" alt="The expanded panel with four sessions, their context sizes, subagents and usage bars"></p>
 <p align="center"><img src="docs/media/reset.gif" width="820" alt="The 5-hour usage resets: the drop-down's bar drains from 97% to 0% while a watering can waters the turnip"></p>
 
@@ -62,15 +62,15 @@ It also handles **questions** (`AskUserQuestion`): pick options with a click or 
 
 ### Read the reply without leaving what you're doing
 
-Scroll down over a session to open its latest reply, rendered from Markdown (headings, lists, code blocks, tables). Page through the last ten turns and send a quick reply from the footer. While Claude may be showing a prompt in that terminal (you sent a request back there, or it timed out), quick reply is paused for the session so your Enter can't pick an option.
+Click ≡ on a session to open its latest reply, rendered from Markdown (headings, lists, code blocks, tables). Page through the last ten turns and send a quick reply from the footer. While Claude may be showing a prompt in that terminal (you sent a request back there, or it timed out), quick reply is paused for the session so your Enter can't pick an option.
 
-<p align="center"><img src="docs/media/reader.gif" width="820" alt="Scrolling over a session row opens the reply reader, which then scrolls through Claude's reply"></p>
+<p align="center"><img src="docs/media/reader.gif" width="820" alt="Clicking ≡ on a session row opens the reply reader, which then scrolls through Claude's reply"></p>
 
 ### Know when it's done, even if you stepped away
 
-When a session finishes, the notch drops down with Claude's last sentence and a reply field, and the turnip springs out of its pot. If you were away (screen locked, asleep, or idle), a **While you were away** summary waits for you instead.
+When a session finishes, the notch drops down with Claude's last sentence and a reply field, and the turnip springs out of its pot. Sessions that finish close together stack as cards instead of replacing each other, and nothing moves while your pointer is on them. **Read** (or scrolling down over it) opens the whole reply, **Mark all read** clears every done mark. If you were away (screen locked, asleep, or idle), a **While you were away** summary waits for you instead.
 
-<p align="center"><img src="docs/media/finished.gif" width="820" alt="A session finishes: the drop-down shows the last reply and the turnip springs out of its pot"></p>
+<p align="center"><img src="docs/media/finished.gif" width="820" alt="A session finishes: the drop-down shows the last reply with a reply field and Read, Mark all read and Close, and the turnip springs out of its pot"></p>
 <p align="center"><img src="docs/media/away.png" width="820" alt="While you were away: one session asked something, two finished"></p>
 
 ### Works with your terminal, editor and Claude Desktop

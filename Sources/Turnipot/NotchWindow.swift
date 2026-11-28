@@ -403,7 +403,7 @@ final class NotchWindowController {
             guard let target = ui.readTarget, appState.session(id: target.sessionId) != nil else { return false }
             guard scrollAccum <= -Self.readScrollThreshold else { return false }
             scrollGestureDone = true
-            ui.stickyFinishedId = nil
+            ui.stickyFinishedIds = nil
             ui.replyTargetId = nil
             appState.openReader(sessionId: target.sessionId)
             return true
@@ -618,13 +618,13 @@ final class NotchWindowController {
             LoginItem.shared.refresh()   // the ⚙ / right-click menu shows its current state
             if appState.readerSessionId != nil, panel?.isKeyWindow != true { requestKey() }
             if ui.suppressHoverUntilExit { return }   // just closed via the × button
-            if case .finished(let sid) = currentPresentation { ui.stickyFinishedId = sid }
+            if case .finished(let ids) = currentPresentation { ui.stickyFinishedIds = ids }
             if currentPresentation == .awaySummary { ui.awaySummaryHovered = true }
             appState.setHovering(true)
         } else {
             // Keep everything open while the user is typing a reply.
             if ui.isEditing { return }
-            ui.stickyFinishedId = nil
+            ui.stickyFinishedIds = nil
             ui.replyTargetId = nil
             // "While you were away" stays until it has been looked at: hovered, then left.
             if ui.awaySummaryHovered {
@@ -641,7 +641,7 @@ final class NotchWindowController {
         // Global monitors only see events for other apps' windows, i.e. outside our panel.
         if ui.isEditing || panel?.isKeyWindow == true { ui.releaseKey() }
         ui.dismissPrompt()   // setup prompts / update notice: a click elsewhere means "not now"
-        ui.stickyFinishedId = nil
+        ui.stickyFinishedIds = nil
         ui.replyTargetId = nil
         if appState.awaySummary != nil {
             // Grace period: the click that ended an idle stretch mustn't close it unseen.
@@ -702,6 +702,7 @@ final class NotchWindowController {
         // Click / hot-key guard: a request that just appeared (or the queue advanced to) ignores
         // actions for 400 ms (FreshContentGate).
         ui.needsYouShown(pendingId)
+        if case .finished(let ids) = p { ui.finishedShown(ids) } else { ui.finishedShown(nil) }
         // Pointer-armed only after the pointer moved onto the drop-down (see HotKeyGate).
         let pointer = NSEvent.mouseLocation
         let pointerArmed = hotKeyGate.update(key: pendingKind != nil || p == .awaySummary ? p.kind : nil,

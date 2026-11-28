@@ -84,6 +84,10 @@ public final class AppState: ObservableObject {
     private var permissionResponders: [UUID: (PermissionDecision) -> Void] = [:]
     private var permissionTimeouts: [UUID: Task<Void, Never>] = [:]
     private var eventExpiry: [UUID: Task<Void, Never>] = [:]
+    /// Finished events whose time ran out while the pointer was on the island: kept (so a drop-down
+    /// that arrived while you were reading another one is still there when you leave) and given
+    /// `NotchConstants.finishedAfterHoverLifetime` once the pointer leaves.
+    private var heldFinishedEvents: Set<UUID> = []
 
     public init(terminal: TerminalControlling? = nil) {
         self.terminal = terminal
@@ -114,6 +118,17 @@ public final class AppState: ObservableObject {
         return !terminalDialogs.isOpen(sessionId)
     }
     public func permission(id: UUID) -> PermissionRequest? { pendingPermissions.first { $0.id == id } }
+
+    /// Sessions with a finished drop-down still alive, oldest first (one entry per session).
+    /// The drop-down stacks them in this order, so a new one lands below those already shown
+    /// instead of replacing them or pushing them down.
+    public var finishedSessionIds: [String] {
+        var ids: [String] = []
+        for e in events {
+            if case .sessionFinished(let sid) = e.kind, !ids.contains(sid) { ids.append(sid) }
+        }
+        return ids
+    }
 
     /// Most recent finished event still alive.
     public var latestFinishedSessionId: String? {
@@ -537,6 +552,7 @@ public final class AppState: ObservableObject {
         readerSessionId = nil
         isPinnedExpanded = false
         isHovering = false
+        releaseHeldFinished()
         recomputeMode()
     }
 
@@ -595,11 +611,26 @@ public final class AppState: ObservableObject {
             if hovering { nearLimitExpiry?.cancel(); nearLimitExpiry = nil }
             else { startNearLimitExpiry(after: NearLimitRule.afterHoverLifetime) }
         }
+        if !hovering { releaseHeldFinished() }
         recomputeMode()
     }
 
+    /// The pointer left: finished drop-downs that ran out of time meanwhile get a few more seconds.
+    private func releaseHeldFinished() {
+        guard !heldFinishedEvents.isEmpty else { return }
+        let held = heldFinishedEvents
+        heldFinishedEvents = []
+        for id in held where events.contains(where: { $0.id == id }) {
+            scheduleExpiry(id, after: NotchConstants.finishedAfterHoverLifetime)
+        }
+    }
+
     public func expand() { isPinnedExpanded = true; recomputeMode() }
-    public func collapse() { isPinnedExpanded = false; isHovering = false; readerSessionId = nil; recomputeMode() }
+    public func collapse() {
+        isPinnedExpanded = false; isHovering = false; readerSessionId = nil
+        releaseHeldFinished()
+        recomputeMode()
+    }
     public func toggleExpanded() { isPinnedExpanded ? collapse() : expand() }
 
     // MARK: Mode
@@ -659,11 +690,20 @@ public final class AppState: ObservableObject {
     private func addEvent(_ kind: TransientEvent.Kind, lifetime: TimeInterval) {
         let e = TransientEvent(kind: kind, lifetime: lifetime)
         events.append(e)
-        let id = e.id
+        scheduleExpiry(e.id, after: lifetime)
+    }
+
+    private func scheduleExpiry(_ id: UUID, after lifetime: TimeInterval) {
+        eventExpiry[id]?.cancel()
         eventExpiry[id] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(lifetime * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }
             self.eventExpiry.removeValue(forKey: id)
+            if self.isHovering, let e = self.events.first(where: { $0.id == id }),
+               case .sessionFinished = e.kind {
+                self.heldFinishedEvents.insert(id)   // expires once the pointer leaves
+                return
+            }
             self.events.removeAll { $0.id == id }
             self.recomputeMode()
         }

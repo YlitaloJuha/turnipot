@@ -2,7 +2,7 @@ import Foundation
 import NotchCore
 
 /// `Turnipot --demo=<state>`: run the UI with fake data and no monitors / sockets, for visual
-/// checks. States: idle, empty (no sessions: one-sided pill), working, finished, permission, nearlimit, expanded, plus the "missed
+/// checks. States: idle, empty (no sessions: one-sided pill), working, finished, finished-stack (two cards), permission, nearlimit, expanded, plus the "missed
 /// sessions" states: unseen (pill "2 done"), unseen-working ("● 1" + "2 done"), unseen-mixed
 /// ("1 waiting · 1 done"), expanded-unseen (2 unseen rows, one waiting, + an idle row with 3
 /// running agents), away (the "While you were away" summary), reader / reader-working (the
@@ -289,6 +289,16 @@ enum DemoMode {
             var next = busyAll
             next[1].status = .idle
             app.updateSessions(next)
+        case "finished-stack":
+            // Two sessions finish a moment apart: the second card stacks under the first.
+            app.updateSessions(busyAll)
+            app.updateUsage(usage)
+            var next = busyAll
+            next[1].status = .idle
+            app.updateSessions(next)
+            next[0].status = .idle
+            next[0].lastAssistantText = webDone
+            app.updateSessions(next)
         case "permission":
             app.updateSessions(busyAll)
             app.updateUsage(usage)
@@ -430,6 +440,7 @@ enum RenderCommand {
                       "expanded-reveal", "expanded-unseen-reveal", "expanded-reply", "reader-reply", "finished-reply",
                       "unseen", "unseen-working", "unseen-mixed", "expanded-unseen", "away",
                       "reader", "reader-working", "expanded-desktop", "expanded-side", "finished-desktop", "reader-desktop",
+                      "finished-stack", "finished-stack-frozen",
                       "question", "question-multi", "question-single", "plan", "plan-feedback"]
         states.append(contentsOf: ["confirmation", "prompt-hook", "update-notice", "finished-dialog"])
         for state in states {
@@ -443,6 +454,7 @@ enum RenderCommand {
             case "expanded-unseen-reveal": base = "expanded-unseen"
             case "reader-reply": base = "reader"
             case "finished-reply": base = "finished"
+            case "finished-stack-frozen": base = "finished-stack"
             default: base = state
             }
             DemoMode.apply(base, to: app)
@@ -453,6 +465,8 @@ enum RenderCommand {
                 ui.readerTurnsSessionId = state == "reader-desktop" ? "demo-mobile-onboarding" : "demo-api-refactor"
             }
             if state == "expanded-desktop" { ui.replyTargetId = "demo-mobile-onboarding" }   // its ↩ slot
+            // Hovering the first card when the second session finished: frozen, "+1 more".
+            if state == "finished-stack-frozen" { ui.stickyFinishedIds = ["demo-api-refactor"] }
             if let req = app.currentPermission {
                 switch state {
                 case "question":         // step 1/2, first option picked

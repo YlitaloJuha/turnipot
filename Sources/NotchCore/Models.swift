@@ -14,6 +14,11 @@ public enum NotchConstants {
     public static let questionUITimeout: TimeInterval = 565
     /// How long the "session finished" drop-down stays visible.
     public static let finishedDisplayDuration: TimeInterval = 6
+    /// A finished drop-down whose time ran out while the pointer was on the island stays this
+    /// long after the pointer leaves.
+    public static let finishedAfterHoverLifetime: TimeInterval = 3
+    /// Most finished drop-downs stacked at once (any more only get their unseen mark in the list).
+    public static let finishedStackLimit = 3
     /// Usage poll interval.
     public static let usagePollInterval: TimeInterval = 120
     /// Session dir fallback poll interval.

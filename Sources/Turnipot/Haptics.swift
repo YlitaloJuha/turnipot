@@ -99,7 +99,7 @@ extension Presentation {
         case .collapsed: return .pill
         case .expanded: return .panel
         case .reader: return .reader
-        case .finished(let sid): return .finished(sessionId: sid)
+        case .finished(let ids): return .finished(sessionId: ids.first ?? "")
         case .permission(let id): return .needsYou(requestId: id)
         case .awaySummary: return .awaySummary
         case .nearLimit, .usageReset: return .nearLimit
