@@ -261,19 +261,20 @@ enum MediaExport {
 
     static let readerScroll: CGFloat = 104
 
-    /// Expanded panel -> scroll down over a row opens the reply reader -> scroll through the reply.
+    /// Expanded panel -> click a row's ≡ to open the reply reader -> scroll through the reply.
     static func readerFrames() -> [Frame] {
         let s = Scene("reader")
         s.ui.readerTurns = DemoMode.readerTurns()
         s.ui.readerTurnsSessionId = "demo-api-refactor"
         let reader = Presentation.reader(sessionId: "demo-api-refactor")
-        let row = CGPoint(x: mid - 120, y: 118), inReader = CGPoint(x: mid + 120, y: 260)
+        // The ≡ button on the "Refactor payment API" row (the pointer's tip sits on it).
+        let row = CGPoint(x: mid - 18, y: 118), inReader = CGPoint(x: mid + 120, y: 260)
         var frames: [Frame] = []
-        frames += segment(0.5) { t in
-            Frame(app: s.app, ui: s.ui, override: s.still(.expanded), pointer: lerp(CGPoint(x: mid + 160, y: 230), row, ease(t / 0.5)))
+        frames += segment(0.7) { t in
+            Frame(app: s.app, ui: s.ui, override: s.still(.expanded), pointer: lerp(CGPoint(x: mid + 160, y: 230), row, ease(t / 0.7)))
         }
-        frames += segment(0.35) { t in   // two-finger scroll down over the row
-            Frame(app: s.app, ui: s.ui, override: s.still(.expanded), pointer: CGPoint(x: row.x, y: row.y + 4 * sin(t * 18)))
+        frames += segment(0.35) { _ in   // rest on ≡, then click
+            Frame(app: s.app, ui: s.ui, override: s.still(.expanded), pointer: row)
         }
         frames += segment(0.7) { t in Frame(app: s.app, ui: s.ui, override: grow(s, from: .expanded, to: reader, t: t), pointer: row) }
         frames += segment(0.3) { t in
@@ -396,7 +397,7 @@ enum MediaExport {
     /// Idle / working / "2 done" pills stacked, each on its own strip.
     static func pillsView() -> some View {
         let rows: [(String, String)] = [("idle", "Idle: the turnip naps in its pot"),
-                                        ("working", "Working: busy sessions + 5-hour usage"),
+                                        ("working", "Working: busy sessions + usage rings"),
                                         ("unseen", "Finished while you looked away")]
         return VStack(spacing: 0) {
             ForEach(rows, id: \.0) { demo, label in

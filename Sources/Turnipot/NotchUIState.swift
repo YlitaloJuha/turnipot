@@ -33,9 +33,10 @@ final class NotchUIState: ObservableObject {
 
     @Published var geometry: NotchGeometry
     @Published var confirmation: Confirmation?
-    /// Keep showing this session's finished drop-down after its event expires (user is hovering /
-    /// typing a reply in it).
-    @Published var stickyFinishedId: String?
+    /// The finished drop-down's stack, frozen while the pointer is on it (or you're typing a reply
+    /// in it): cards don't expire, and a session that finishes meanwhile doesn't add a card (which
+    /// would move the buttons under the pointer); the strip counts it as "+1 more" instead.
+    @Published var stickyFinishedIds: [String]?
     /// Session whose inline reply field is open in the expanded panel.
     @Published var replyTargetId: String?
     /// A ReplyField currently has keyboard focus.
@@ -215,6 +216,25 @@ final class NotchUIState: ObservableObject {
     /// 400 ms after it appeared (or the queue advanced to it). Not published.
     private var needsYouGate = FreshContentGate()
 
+    /// Click guard for the finished drop-down: after its stack changed (a card was added or
+    /// removed, so the buttons may have moved under the pointer) its buttons do nothing for 400 ms.
+    private var finishedGate = FreshContentGate()
+
+    /// The finished stack on screen (nil = none); NotchWindowController calls this on every change.
+    func finishedShown(_ sessionIds: [String]?) { finishedGate.show(sessionIds?.joined(separator: "\n"), at: Date()) }
+
+    /// May a button in the finished drop-down act now? (False within 400 ms of its stack changing.)
+    func finishedActionAllowed(_ sessionIds: [String]) -> Bool {
+        finishedGate.attempt(sessionIds.joined(separator: "\n"), at: Date())
+    }
+
+    /// A card left the frozen stack (replied to): the others stay where they are.
+    func unstickFinished(_ sessionId: String) {
+        guard var ids = stickyFinishedIds else { return }
+        ids.removeAll { $0 == sessionId }
+        stickyFinishedIds = ids.isEmpty ? nil : ids
+    }
+
     /// The needs-you request on screen (nil = none); NotchWindowController calls this on every change.
     func needsYouShown(_ requestId: UUID?) { needsYouGate.show(requestId?.uuidString, at: Date()) }
 
@@ -269,7 +289,7 @@ final class NotchUIState: ObservableObject {
 
     /// End any in-island interaction (reply editing, sticky drop-downs).
     func resetInteraction() {
-        stickyFinishedId = nil
+        stickyFinishedIds = nil
         replyTargetId = nil
         if isEditing { releaseKey() }
     }
@@ -279,7 +299,9 @@ final class NotchUIState: ObservableObject {
 enum Presentation: Equatable {
     /// Collapsed pill; `wing` = width of each side of the notch (content-driven).
     case collapsed(wing: CGFloat)
-    case finished(sessionId: String)
+    /// Finished drop-downs stacked oldest first (newest at the bottom, so cards already on screen
+    /// never move when another session finishes).
+    case finished(sessionIds: [String])
     case awaySummary
     case permission(requestId: UUID)
     case expanded
@@ -295,7 +317,10 @@ enum Presentation: Equatable {
     var kind: String {
         switch self {
         case .collapsed: return "collapsed"
-        case .finished(let s): return "finished-\(s)"
+        // One identity for the whole stack: adding or removing a card (even the top one, when it
+        // times out first) resizes the drop-down in place instead of fading it out and growing a
+        // new one, which looked like the island collapsing and reopening.
+        case .finished: return "finished"
         case .permission(let id): return "permission-\(id)"
         case .expanded: return "expanded"
         case .nearLimit: return "nearLimit"
@@ -315,13 +340,17 @@ enum Presentation: Equatable {
         if case .reader(let sid) = appState.mode, appState.session(id: sid) != nil { return .reader(sessionId: sid) }
         if ui.confirmation != nil { return .confirmation }
         if appState.mode == .awaySummary, appState.awaySummary != nil { return .awaySummary }
-        // Held open by hover, but not once the session is working again (answered elsewhere).
-        if let sid = ui.stickyFinishedId, let s = appState.session(id: sid), s.status != .busy {
-            return .finished(sessionId: sid)
+        // Held open (and frozen) by hover. A card whose session is working again stays in place
+        // (marked "working again") so the others don't move; once all are, it closes.
+        if let ids = ui.stickyFinishedIds {
+            let live = ids.filter { appState.session(id: $0) != nil }
+            if live.contains(where: { appState.session(id: $0)?.status != .busy }) {
+                return .finished(sessionIds: live)
+            }
         }
         switch appState.mode {
-        case .finished(let sid) where appState.session(id: sid) != nil:
-            return .finished(sessionId: sid)
+        case .finished where !finishedStack(appState).isEmpty:
+            return .finished(sessionIds: finishedStack(appState))
         case .expanded:
             return .expanded
         case .nearLimit where appState.usage.nearLimitWindow != nil:
@@ -331,6 +360,14 @@ enum Presentation: Equatable {
         default:
             return .collapsed(wing: PillLayout.wing(appState: appState, ui: ui))
         }
+    }
+
+    /// The finished drop-downs to stack when nothing is frozen: oldest first, at most
+    /// `NotchConstants.finishedStackLimit`.
+    @MainActor
+    static func finishedStack(_ appState: AppState) -> [String] {
+        Array(appState.finishedSessionIds.filter { appState.session(id: $0) != nil }
+            .prefix(NotchConstants.finishedStackLimit))
     }
 
     /// Right edge pulled in by this much (one-sided idle pill, see PillLayout.oneSided).
@@ -353,12 +390,11 @@ enum Presentation: Equatable {
         case .awaySummary:
             return CGSize(width: NotchGeometry.awaySummaryWidth,
                           height: strip + AwaySummaryMetrics.bodyHeight(appState.awaySummary))
-        case .finished(let sid):
-            let s = appState.session(id: sid)
-            let hasText = !(s?.lastAssistantText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-            let body = hasText ? NotchGeometry.finishedSize.height : NotchGeometry.finishedSize.height - 42
-            let replyExtra = s?.isClaudeDesktop == false ? ui.replyFieldExtra[FinishedView.replySlot(sid)] ?? 0 : 0
-            return CGSize(width: NotchGeometry.finishedSize.width, height: strip + body + replyExtra)
+        case .finished(let ids):
+            let cards = ids.enumerated().reduce(CGFloat(0)) { sum, c in
+                sum + FinishedView.cardHeight(appState.session(id: c.element), index: c.offset, ui: ui)
+            }
+            return CGSize(width: NotchGeometry.finishedSize.width, height: strip + cards + FinishedView.bottomRowHeight)
         case .permission(let rid):
             if let r = appState.permission(id: rid) {
                 switch r.kind {

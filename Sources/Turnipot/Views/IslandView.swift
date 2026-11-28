@@ -277,9 +277,10 @@ struct IslandView: View {
             if let summary = appState.awaySummary {
                 AwaySummaryView(appState: appState, summary: summary)
             }
-        case .finished(let sid):
-            if let s = appState.session(id: sid) {
-                FinishedView(appState: appState, session: s)
+        case .finished(let ids):
+            let sessions = ids.compactMap { appState.session(id: $0) }
+            if !sessions.isEmpty {
+                FinishedView(appState: appState, sessions: sessions)
             }
         case .permission(let rid):
             if let r = appState.permission(id: rid) {

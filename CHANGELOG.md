@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+
+- Sessions that finish close together stack in the "finished" drop-down instead of the newer one replacing the older: up to 3 cards, oldest on top, each with its own **Read** and reply field ("✓ 2 done" in the notch). A new card is added at the bottom, so nothing moves under the pointer. While the pointer is on the drop-down nothing is added or times out; a session that finishes meanwhile shows as "+1 more" and gets its card when you move away. Buttons ignore clicks for 400 ms after a card is added or removed.
+- The README pictures are re-rendered for 0.8.x (usage rings, the finished drop-down's buttons, ≡ opens the reader).
+
 ## 0.8.1
 
 - Scrolling the session list never opens a chat: it only scrolls the list. Click ≡ on a row to read its reply. Scrolling down still opens the reply from the "finished" drop-down and the "While you were away" summary.

@@ -132,6 +132,19 @@ func registerAppStateTests() {
             app.updateSessions([ClaudeSession(pid: 1, sessionId: "s", cwd: "/x", name: "s", status: .busy, startedAt: t0, updatedAt: t0)])
             expectEqual(app.mode, .collapsed, "continue: busy again closes the finished drop-down")
             check("continue: no longer unseen", !app.hasUnseen)
+
+            // Sessions finishing a moment apart stack oldest first (a new card lands below).
+            func sess(_ id: String, _ st: SessionStatus) -> ClaudeSession {
+                ClaudeSession(pid: 1, sessionId: id, cwd: "/x", name: id, status: st, startedAt: t0, updatedAt: t0)
+            }
+            app.updateSessions([sess("a", .busy), sess("b", .busy), sess("c", .busy)])
+            app.updateSessions([sess("a", .busy), sess("b", .idle), sess("c", .busy)])
+            app.updateSessions([sess("a", .idle), sess("b", .idle), sess("c", .busy)])
+            expectEqual(app.finishedSessionIds, ["b", "a"], "stack: oldest first")
+            app.updateSessions([sess("a", .idle), sess("b", .busy), sess("c", .idle)])
+            expectEqual(app.finishedSessionIds, ["a", "c"], "stack: continued session leaves, newcomer appended")
+            app.dismissFinished()
+            check("stack: Close clears every card", app.finishedSessionIds.isEmpty)
         }
     }
 }
